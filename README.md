@@ -35,11 +35,23 @@ affiché.
 
 ## Démarrage rapide (Docker)
 
+L'image publique est publiée sur GHCR — **rien à builder, aucun login** :
+
 ```sh
 docker compose -f docker-compose.deploy.yml up -d
 ```
 
 Puis ouvre `http://localhost:8080` et crée ton compte administrateur.
+
+**Mettre à jour**, ensuite, tient en deux commandes :
+
+```sh
+docker compose -f docker-compose.deploy.yml pull
+docker compose -f docker-compose.deploy.yml up -d
+```
+
+> Image : `ghcr.io/fuzzinvaders/tentacle` — tag `latest` (dernier `main`), `sha-xxxxxxx` (un
+> commit précis) ou `X.Y.Z` (une version publiée).
 
 > ⚠️ Derrière un reverse proxy, la variable **`ORIGIN`** est obligatoire (sinon la connexion
 > échoue) — voir [Installation Docker](https://github.com/fuzzinvaders/Tentacle/wiki/Installation-Docker).

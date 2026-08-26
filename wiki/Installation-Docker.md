@@ -66,36 +66,38 @@ docker run -d --name tentacle -p 8080:3000 --restart unless-stopped \
   tentacle:latest
 ```
 
-## Méthode 3 — Déployer depuis le registre Gitea
+## Méthode 3 — Déployer l'image publique *(la plus simple)*
 
-L'image est publiée automatiquement sur le registre de conteneurs de Gitea (voir [Publication automatique](#publication-automatique-de-limage-ci-gitea-actions)). Sur ton serveur, tu n'as alors **pas besoin des sources ni de builder** : tu tires l'image toute faite avec `docker-compose.deploy.yml`.
-
-Aucun registre n'est codé en dur dans le dépôt : l'image à déployer se déclare dans un fichier
-`.env` posé à côté du `docker-compose`. Copie le modèle et renseigne-le :
+Une image publique est publiée à chaque commit sur `main`. Sur ton serveur, **rien à builder,
+aucun login, et pas besoin des sources** — juste le fichier `docker-compose.deploy.yml` :
 
 ```sh
-cp .env.example .env
-# puis, dans .env :
-#   TENTACLE_IMAGE=<ton-registre>/<utilisateur>/tentacle:latest
-#   ORIGIN=https://tentacle.exemple.fr
-```
-
-Si `TENTACLE_IMAGE` manque, Compose s'arrête avec un message explicite plutôt que de tirer une
-image inattendue.
-
-```sh
-# 1. Si le registre est privé, s'authentifier une fois
-docker login <ton-instance-gitea>
-
-# 2. Démarrer (télécharge l'image déclarée dans TENTACLE_IMAGE)
+# Démarrer
 docker compose -f docker-compose.deploy.yml up -d
 
-# 3. Mettre à jour vers la dernière image publiée
+# Mettre à jour, plus tard
 docker compose -f docker-compose.deploy.yml pull
 docker compose -f docker-compose.deploy.yml up -d
 ```
 
-L'image est disponible sur **`<registre>/<utilisateur>/tentacle`** avec les tags :
+C'est tout : `docker-compose.deploy.yml` pointe par défaut sur
+**`ghcr.io/fuzzinvaders/tentacle:latest`**.
+
+Un `.env` posé à côté sert à régler le reste (`ORIGIN`, `AUTH_SECRET`, `SETUP_TOKEN`…) :
+
+```sh
+cp .env.example .env
+```
+
+Pour t'écarter de l'image publique — registre privé, image construite localement, ou tag figé
+au lieu de `latest` — renseigne `TENTACLE_IMAGE` dans ce `.env` :
+
+```sh
+TENTACLE_IMAGE=ghcr.io/fuzzinvaders/tentacle:1.0.0
+TENTACLE_IMAGE=<ton-registre>/<utilisateur>/tentacle:latest   # registre privé → docker login
+```
+
+L'image est disponible sur **`ghcr.io/fuzzinvaders/tentacle`** avec les tags :
 
 | Tag | Correspond à |
 | --- | --- |
@@ -103,9 +105,27 @@ L'image est disponible sur **`<registre>/<utilisateur>/tentacle`** avec les tags
 | `sha-xxxxxxx` | un commit précis de `main` |
 | `X.Y.Z` / `X.Y` | un tag git de version `vX.Y.Z` |
 
-## Publication automatique de l'image (CI Gitea Actions)
+## Publication automatique de l'image
 
-Le workflow [`.gitea/workflows/docker-publish.yml`](https://github.com/fuzzinvaders/Tentacle/blob/main/.gitea/workflows/docker-publish.yml) build et pousse l'image à chaque :
+Deux workflows coexistent, indépendants — chaque plateforme n'exécute que le sien :
+
+| Workflow | Plateforme | Publie vers |
+| --- | --- | --- |
+| [`.github/workflows/docker-publish.yml`](https://github.com/fuzzinvaders/Tentacle/blob/main/.github/workflows/docker-publish.yml) | GitHub Actions | **GHCR, image publique** — c'est celle que tire `docker-compose.deploy.yml` |
+| [`.gitea/workflows/docker-publish.yml`](https://github.com/fuzzinvaders/Tentacle/blob/main/.gitea/workflows/docker-publish.yml) | Gitea Actions | le registre de l'instance qui exécute le job (utile pour un miroir privé) |
+
+Les deux produisent les mêmes tags, à partir du même `Dockerfile`.
+
+### ⚠️ À faire une seule fois, après la première publication GHCR
+
+Le paquet créé par GHCR est **privé par défaut, même sur un dépôt public**. Tant qu'il l'est,
+`docker pull` réclamera un login. Pour le rendre public :
+
+**Page du dépôt → Packages → `tentacle` → Package settings → Change visibility → Public.**
+
+### CI Gitea (miroir privé, optionnel)
+
+Le workflow Gitea build et pousse l'image à chaque :
 
 - **push sur `main`** → tags `latest` + `sha-<court>`
 - **push d'un tag `vX.Y.Z`** → tags `X.Y.Z` et `X.Y`

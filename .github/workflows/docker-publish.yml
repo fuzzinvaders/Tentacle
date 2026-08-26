@@ -1,0 +1,94 @@
+name: Build & publish Docker image (GHCR)
+
+# Publie l'image publique sur le registre de conteneurs de GitHub (GHCR), pour que la mise à
+# jour d'une instance se réduise à `docker compose pull && docker compose up -d`, sans avoir
+# à builder ni à s'authentifier.
+#
+#   push sur main        -> tags `latest` et `sha-<court>`
+#   push d'un tag vX.Y.Z -> tags `X.Y.Z` et `X.Y`
+#
+# ⚠️ APRÈS LA PREMIÈRE PUBLICATION : le paquet créé par GHCR est PRIVÉ par défaut, même sur un
+# dépôt public. Passe-le en public une seule fois — page du dépôt → Packages → `tentacle` →
+# Package settings → Change visibility → Public. Sans cela, `docker pull` réclamera un login.
+#
+# Le nom de l'image est déduit du dépôt (`ghcr.io/<propriétaire>/tentacle`), donc ce fichier
+# fonctionne tel quel sur un fork.
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  # Permet de republier sans nouveau commit (onglet Actions → Run workflow).
+  workflow_dispatch:
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve image name and version metadata
+        run: |
+          # Docker impose des minuscules ; le nom du dépôt peut en contenir des majuscules.
+          OWNER=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')
+          echo "IMAGE=ghcr.io/$OWNER/tentacle" >> "$GITHUB_ENV"
+          # Commit COURT et date du jour : c'est ce que le pied de page de l'app affiche.
+          # `github.sha` est le SHA long, d'où le calcul ici.
+          echo "SOURCE_COMMIT=$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
+          echo "SOURCE_DATE=$(date -u +%Y-%m-%d)" >> "$GITHUB_ENV"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          # Jeton automatique du job : aucun secret à configurer.
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=short,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Métadonnées de version affichées dans le pied de page de l'app. Le conteneur de
+          # build n'a pas accès à git (.git est exclu par .dockerignore) : on les passe donc
+          # explicitement, comme le fait le workflow Gitea.
+          build-args: |
+            SOURCE_COMMIT=${{ env.SOURCE_COMMIT }}
+            SOURCE_DATE=${{ env.SOURCE_DATE }}
+          # Cache partagé entre exécutions : le `npm ci` du build est ce qui coûte le plus cher.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Résumé
+        run: |
+          echo "### Image publiée" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo '${{ steps.meta.outputs.tags }}' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "Mise à jour d'une instance :" >> "$GITHUB_STEP_SUMMARY"
+          echo '```sh' >> "$GITHUB_STEP_SUMMARY"
+          echo 'docker compose -f docker-compose.deploy.yml pull' >> "$GITHUB_STEP_SUMMARY"
+          echo 'docker compose -f docker-compose.deploy.yml up -d' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"

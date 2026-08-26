@@ -1,8 +1,8 @@
-# Deploiement de Tentacle a partir de l'image publiee sur le registre Gitea.
-# (Ne build pas : tire l'image construite par la CI Gitea Actions.)
+# Deploiement de Tentacle a partir de l'image publique (GHCR).
+# (Ne build pas : tire l'image construite par la CI.)
 #
 # Usage :
-#   docker login <ton-registre>          # si le registre est prive
+#   # Aucun login n'est necessaire pour l'image publique.
 #   docker compose -f docker-compose.deploy.yml up -d
 #   # Mise a jour :
 #   docker compose -f docker-compose.deploy.yml pull && \
@@ -10,7 +10,9 @@
 
 services:
   tentacle:
-    image: ${TENTACLE_IMAGE:?Definis TENTACLE_IMAGE (ex. registre.exemple.fr/utilisateur/tentacle:latest) — voir .env.example}
+    # Image PUBLIQUE par defaut : rien a builder, rien a configurer, aucun login.
+    # Surcharge possible via TENTACLE_IMAGE (registre prive, image locale, tag fixe).
+    image: ${TENTACLE_IMAGE:-ghcr.io/fuzzinvaders/tentacle:latest}
     container_name: tentacle
     restart: unless-stopped
     pull_policy: always
