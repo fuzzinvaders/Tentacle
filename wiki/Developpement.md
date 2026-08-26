@@ -85,7 +85,7 @@ src/
 │  ├─ *Track.ts            # adaptateurs vers le bus audio commun
 │  └─ rss.ts chapters.ts opml.ts jspf.ts lrc.ts alarmSchedule.ts …
 │                          # fonctions PURES (c'est ce qui est couvert par les tests)
-└─ scripts/                # build-mobile.mjs, sync-wiki.ps1 (à la racine du dépôt)
+└─ scripts/                # build-mobile.mjs, sync-wiki.ps1, sync-public.ps1
 ```
 
 ## Tests et vérifications
@@ -122,6 +122,39 @@ git add wiki && git commit -m "Docs : …"
 Le script clone le dépôt wiki dans un dossier temporaire, y recopie `wiki/*.md`, committe et pousse
 (sans rien faire s'il n'y a aucun changement). Conventions de nommage Gitea : un `-` dans un nom de
 fichier s'affiche comme une espace dans le titre de la page.
+
+## Miroir public
+
+Le dépôt public reçoit des **instantanés**, pas l'historique : celui du dépôt de travail porte
+l'identité réelle de l'auteur dans chaque commit, ce qu'aucune modification de fichier n'effacerait.
+À chaque publication, le contenu suivi par git remplace celui du miroir et un seul commit résume le
+changement.
+
+```sh
+# une fois pour toutes : déclarer le miroir
+git remote add public https://github.com/<compte>/<depot>.git
+# une fois pour toutes : renseigner les motifs qui ne doivent jamais partir
+cp scripts/forbidden-patterns.example.txt scripts/forbidden-patterns.txt
+
+# publier (message = sujet du dernier commit par défaut)
+.scriptssync-public.ps1
+# répétition à blanc : montre le diff et joue le contrôle, sans rien pousser
+.scriptssync-public.ps1 -DryRun
+```
+
+Le script **refuse de publier** dans trois cas, et c'est son intérêt principal :
+
+| Situation | Pourquoi c'est bloquant |
+| --- | --- |
+| Un motif interdit apparaît dans l'index | Une donnée personnelle poussée sur un dépôt public est irrécupérable. Le contrôle porte sur l'index, donc sur ce qui partirait exactement. |
+| `scripts/forbidden-patterns.txt` est absent | Publier sans contrôle est refusé plutôt que toléré. Ce fichier est ignoré par git : l'inscrire dans le dépôt publierait ce qu'il sert à bloquer. |
+| L'arbre de travail est modifié | L'instantané vient de `HEAD`, pas du disque : on croirait publier ses modifications en cours alors qu'elles seraient ignorées. |
+
+> ⚠️ Si une donnée personnelle finit malgré tout dans un commit public, la retirer du `HEAD` ne
+> suffit pas : GitHub conserve les commits devenus inatteignables et les sert encore par URL de
+> SHA direct (`raw`, API, `git fetch` explicite). Une réécriture d'historique en force les retire
+> des listes et des clones, mais pas de ce stockage. Seule la suppression du dépôt — ou une demande
+> au support GitHub — les purge réellement.
 
 ## Workflow git
 
