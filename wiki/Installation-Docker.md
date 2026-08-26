@@ -251,6 +251,36 @@ DOMAIN=tentacle.exemple.fr docker compose -f docker-compose.traefik.yml up -d
 
 `ORIGIN` est dérivé automatiquement de `DOMAIN` (`https://$DOMAIN`) — pas besoin de le redéfinir séparément.
 
+#### Si ce domaine n'est pas chez le même fournisseur DNS que tes autres domaines
+
+Un resolver ACME en DNS-01 est lié à **un seul fournisseur DNS** (celui du jeton API configuré
+dessus). Si ton resolver `letsencrypt` gère déjà un domaine chez Infomaniak par exemple, et que
+celui de Tentacle est chez OVH, Cloudflare ou un autre registrar, ce même resolver **ne pourra
+jamais** émettre de certificat pour ce domaine : impossible de poser le `TXT _acme-challenge` sur
+une zone qu'il ne gère pas.
+
+Symptôme : le navigateur affiche un certificat auto-signé Traefik (`TRAEFIK DEFAULT CERT`) au lieu
+d'un certificat Let's Encrypt, et les logs Traefik montrent une erreur du type `unknown zone for
+'_acme-challenge.<domaine>'` ou `dns01: error presenting token`.
+
+La solution est un **second resolver** dans la config statique Traefik (hors de ce dépôt),
+utilisant le provider `lego` du fournisseur qui gère réellement ce domaine — par exemple pour OVH :
+
+```yaml
+certificatesResolvers:
+  ovh:
+    acme:
+      email: ton-email@exemple.fr
+      storage: /letsencrypt/acme-ovh.json   # fichier séparé de celui des autres domaines
+      dnsChallenge:
+        provider: ovh
+```
+
+avec les identifiants API OVH ([créés ici](https://eu.api.ovh.com/createToken/)) passés en
+variables d'environnement au conteneur Traefik : `OVH_ENDPOINT`, `OVH_APPLICATION_KEY`,
+`OVH_APPLICATION_SECRET`, `OVH_CONSUMER_KEY`. Le label `certresolver` de Tentacle référence
+ensuite le nom de ce resolver (`ovh`, pas `letsencrypt`).
+
 ## Instance de démonstration
 
 Une instance **vitrine**, publique, où les visiteurs n'ont aucun serveur Jellyfin à connecter —

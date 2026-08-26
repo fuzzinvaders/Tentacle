@@ -7,6 +7,18 @@
 #   - entrypoints=websecure : adapte au nom de ton entrypoint HTTPS Traefik
 #   - certresolver         : ajoute si tu utilises la resolution ACME de Traefik
 #
+# ATTENTION si Traefik gere deja d'autres domaines : un resolver ACME en DNS-01 est lie a
+# UN SEUL fournisseur DNS (le token API configure sur ce resolver). S'il gere par exemple
+# ton domaine principal chez Infomaniak et que ${DOMAIN} est enregistre chez un autre
+# fournisseur (OVH, Cloudflare...), le meme resolver ne pourra JAMAIS emettre de certificat
+# pour ce domaine : le provider ne sait pas poser le TXT `_acme-challenge` sur une zone
+# qu'il ne gere pas. Le symptome est un certificat auto-signe Traefik ("TRAEFIK DEFAULT
+# CERT") servi a la place, et dans les logs Traefik une erreur `unknown zone for
+# '_acme-challenge.<domaine>'` ou `dns01: error presenting token`.
+# Il faut alors un SECOND resolver dans la config statique Traefik, pointant vers le
+# fournisseur qui gere reellement ce domaine, puis referencer son nom dans le label
+# `certresolver` ci-dessous (pas forcement `letsencrypt`).
+#
 # Usage :
 #   docker network create proxy   # si le reseau n'existe pas encore
 #   DOMAIN=tentacle.exemple.fr docker compose -f docker-compose.traefik.yml up -d
@@ -42,6 +54,9 @@ services:
       - traefik.http.routers.tentacle.rule=Host(`${DOMAIN}`)
       - traefik.http.routers.tentacle.entrypoints=websecure
       - traefik.http.routers.tentacle.tls=true
+      # Nom du resolver ACME configure dans Traefik pour LE FOURNISSEUR DNS QUI GERE
+      # CE DOMAINE precisement (voir l'avertissement en haut de fichier) — pas forcement
+      # celui utilise pour tes autres domaines.
       # - traefik.http.routers.tentacle.tls.certresolver=letsencrypt
       - traefik.http.services.tentacle.loadbalancer.server.port=3000
 
