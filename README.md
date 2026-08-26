@@ -54,19 +54,19 @@ docker compose -f docker-compose.deploy.yml up -d
 > commit précis) ou `X.Y.Z` (une version publiée).
 
 > ⚠️ Derrière un reverse proxy, la variable **`ORIGIN`** est obligatoire (sinon la connexion
-> échoue) — voir [Installation Docker](https://github.com/fuzzinvaders/Tentacle/wiki/Installation-Docker).
+> échoue) — voir [Installation Docker](wiki/Installation-Docker.md).
 
 ## Documentation
 
-Tout est dans le [**wiki**](https://github.com/fuzzinvaders/Tentacle/wiki) :
+Tout est dans le [**wiki**](wiki/) :
 
-- 📖 [Guide d'utilisation](https://github.com/fuzzinvaders/Tentacle/wiki/Guide-utilisation) — toutes les fonctions, écran par écran
-- ⚙️ [Configuration des sources](https://github.com/fuzzinvaders/Tentacle/wiki/Configuration) — connecter Jellyfin, podcasts, scrobbling…
-- 🐳 [Installation Docker](https://github.com/fuzzinvaders/Tentacle/wiki/Installation-Docker)
-- 📱 [Application mobile (APK)](https://github.com/fuzzinvaders/Tentacle/wiki/Application-Mobile-APK)
-- 🏛️ [Architecture](https://github.com/fuzzinvaders/Tentacle/wiki/Architecture) — ce qui tourne où, web vs mobile
-- 🛠️ [Développement local](https://github.com/fuzzinvaders/Tentacle/wiki/Developpement)
-- 🧪 [Plan de test](https://github.com/fuzzinvaders/Tentacle/wiki/Plan-de-test)
+- 📖 [Guide d'utilisation](wiki/Guide-utilisation.md) — toutes les fonctions, écran par écran
+- ⚙️ [Configuration des sources](wiki/Configuration.md) — connecter Jellyfin, podcasts, scrobbling…
+- 🐳 [Installation Docker](wiki/Installation-Docker.md)
+- 📱 [Application mobile (APK)](wiki/Application-Mobile-APK.md)
+- 🏛️ [Architecture](wiki/Architecture.md) — ce qui tourne où, web vs mobile
+- 🛠️ [Développement local](wiki/Developpement.md)
+- 🧪 [Plan de test](wiki/Plan-de-test.md)
 
 ## Développement
 
