@@ -1,0 +1,10 @@
+# Motifs interdits dans le miroir public : une expression reguliere par ligne.
+# Copie ce fichier en `forbidden-patterns.txt` (ignore par git) et renseigne-le avec ce qui
+# ne doit jamais partir : nom de domaine personnel, identifiant systeme, adresse de courriel,
+# chemins absolus revelant un nom d'utilisateur...
+#
+# Ce fichier-ci ne contient QUE des exemples : le vrai n'est pas versionne, sinon il
+# publierait exactement ce qu'il sert a bloquer.
+mon-domaine-perso\.fr
+/home/monidentifiant
+prenom@mondomaine\.fr

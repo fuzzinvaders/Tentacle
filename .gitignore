@@ -28,3 +28,6 @@ vite.config.ts.timestamp-*
 
 # Claude Code (local machine settings)
 .claude/settings.local.json
+
+# Motifs de confidentialite du miroir public : local, jamais publie (voir le .example).
+scripts/forbidden-patterns.txt
