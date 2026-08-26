@@ -116,10 +116,20 @@ Deux workflows coexistent, indépendants — chaque plateforme n'exécute que le
 
 Les deux produisent les mêmes tags, à partir du même `Dockerfile`.
 
-### ⚠️ À faire une seule fois, après la première publication GHCR
+### Visibilité du paquet GHCR, à vérifier une fois
 
-Le paquet créé par GHCR est **privé par défaut, même sur un dépôt public**. Tant qu'il l'est,
-`docker pull` réclamera un login. Pour le rendre public :
+Sur ce dépôt, le paquet est sorti **public directement** : il hérite de la visibilité du dépôt, et
+un `docker pull` sans aucune authentification fonctionne — vérifié par un tirage anonyme de
+`ghcr.io/fuzzinvaders/tentacle:latest`. Aucune action n'a été nécessaire.
+
+Selon le compte et son historique, GHCR peut au contraire créer le paquet **privé**. Le test tient
+en une commande, depuis n'importe quelle machine non authentifiée :
+
+```sh
+docker logout ghcr.io && docker pull ghcr.io/fuzzinvaders/tentacle:latest
+```
+
+S'il réclame un login, rends-le public une seule fois :
 
 **Page du dépôt → Packages → `tentacle` → Package settings → Change visibility → Public.**
 

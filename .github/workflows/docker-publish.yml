@@ -7,9 +7,11 @@ name: Build & publish Docker image (GHCR)
 #   push sur main        -> tags `latest` et `sha-<court>`
 #   push d'un tag vX.Y.Z -> tags `X.Y.Z` et `X.Y`
 #
-# ⚠️ APRÈS LA PREMIÈRE PUBLICATION : le paquet créé par GHCR est PRIVÉ par défaut, même sur un
-# dépôt public. Passe-le en public une seule fois — page du dépôt → Packages → `tentacle` →
-# Package settings → Change visibility → Public. Sans cela, `docker pull` réclamera un login.
+# VISIBILITÉ DU PAQUET : à vérifier après la première publication. Sur ce dépôt, le paquet est
+# sorti PUBLIC directement (visibilité héritée du dépôt) et `docker pull` fonctionne sans login —
+# vérifié par un tirage anonyme. Selon le compte, GHCR peut au contraire le créer PRIVÉ : si le
+# pull réclame une authentification, passe-le en public une fois — page du dépôt → Packages →
+# `tentacle` → Package settings → Change visibility → Public.
 #
 # Le nom de l'image est déduit du dépôt (`ghcr.io/<propriétaire>/tentacle`), donc ce fichier
 # fonctionne tel quel sur un fork.
