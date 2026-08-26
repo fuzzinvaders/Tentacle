@@ -1,0 +1,17 @@
+# Config minimale pour act_runner. Genere a l'origine via :
+#   docker run --rm gitea/act_runner:latest act_runner generate-config
+# puis reduite aux options qui comptent ici. Les champs absents reprennent
+# les valeurs par defaut d'act_runner.
+
+runner:
+  file: .runner
+  capacity: 1
+
+container:
+  # Partage le docker du serveur hote avec CHAQUE conteneur de job (necessaire
+  # pour que "docker buildx build" fonctionne depuis le job). Equivaut a donner
+  # au job un acces root sur l'hote -> n'utilise ce runner que pour tes propres
+  # workflows de confiance.
+  options: "-v /var/run/docker.sock:/var/run/docker.sock"
+  valid_volumes:
+    - "/var/run/docker.sock"

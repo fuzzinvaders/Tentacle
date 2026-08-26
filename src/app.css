@@ -1,0 +1,547 @@
+@font-face {
+	font-family: 'Pixelify Sans';
+	src: url('/fonts/pixelify-sans-variable.ttf') format('truetype-variations');
+	font-weight: 400 700;
+	font-style: normal;
+	font-display: swap;
+}
+
+/*
+ * Palettes de thème. Chaque thème définit le même jeu de variables — basculer `data-theme`
+ * sur <html> suffit à re-skinner toute l'app.
+ *
+ * - terminus  — le thème par défaut, inspiré de l'univers d'Eastward : nuit teal profonde,
+ *   lueurs ambrées de lanternes, métal patiné, touches corail. C'est le look principal.
+ * - tentacle  — la palette violette/or du site d'origine.
+ * - phosphore — terminal CRT vert rétro.
+ *
+ * Variables :
+ *   --ink        fond de page (nuit)
+ *   --plum       fond de panneau
+ *   --plum-deep  fond de panneau enfoncé / champs
+ *   --panel*     dégradé métallique des surfaces en relief (hi/mid/lo)
+ *   --glow       halo lumineux d'accent (lanterne)
+ */
+:root,
+[data-theme='terminus'] {
+	--ink: #0d1b1e;
+	--plum: #16292d;
+	--plum-deep: #0f2023;
+	--panel: #223a3c;
+	--panel-hi: #2f4b4a;
+	--panel-lo: #182e30;
+	--cream: #e8d9b5;
+	--cream-bright: #ffedb3;
+	--metal-dark: #3f5253;
+	--metal-mid: #6f8577;
+	--muted: #9cae9c;
+	--gold: #e09a3e;
+	--gold-bright: #ffbe5c;
+	--rust: #a8542f;
+	--teal: #55b3a1;
+	--coral: #e8795a;
+	--shadow: #0a1517;
+	--bezel: #050d0f;
+	--glow: rgba(255, 190, 92, 0.35);
+	--glow-faint: rgba(255, 190, 92, 0.15);
+}
+
+[data-theme='tentacle'] {
+	--ink: #17121d;
+	--plum: #2b2332;
+	--plum-deep: #1d1724;
+	--panel: #322940;
+	--panel-hi: #413553;
+	--panel-lo: #251d31;
+	--cream: #d8cfb8;
+	--cream-bright: #f7e7b7;
+	--metal-dark: #635d55;
+	--metal-mid: #9a9181;
+	--muted: #c5b59f;
+	--gold: #dfa252;
+	--gold-bright: #f4c06a;
+	--rust: #884c35;
+	--teal: #82aaa0;
+	--coral: #c9857b;
+	--shadow: #0f0a14;
+	--bezel: #0d0b10;
+	--glow: rgba(244, 192, 106, 0.32);
+	--glow-faint: rgba(244, 192, 106, 0.14);
+}
+
+/*
+ * nocturne — refonte maison : pixel-art « hi-res » façon Eastward, palette Dracula.
+ * Au-delà de la palette, ce thème redéfinit les variables STRUCTURELLES (rayons,
+ * ombres portées douces, suppression des coins crantés et des rivets, scanlines
+ * atténuées, ciel nocturne violet) que tous les composants consomment. Les autres
+ * thèmes gardent les valeurs par défaut, donc le look historique reste intact.
+ */
+[data-theme='nocturne'] {
+	/* Palette Dracula */
+	--ink: #191a21;
+	--plum: #282a36;
+	--plum-deep: #21222c;
+	--panel: #2c2e3e;
+	--panel-hi: #383b4e;
+	--panel-lo: #232430;
+	--cream: #f8f8f2;
+	--cream-bright: #ffffff;
+	--metal-dark: #44475a;
+	--metal-mid: #6272a4;
+	--muted: #98a3d0;
+	--gold: #bd93f9;
+	--gold-bright: #ff79c6;
+	--rust: #7b2fbe;
+	--teal: #8be9fd;
+	--coral: #ff5555;
+	--shadow: #101018;
+	--bezel: #14151d;
+	--glow: rgba(189, 147, 249, 0.4);
+	--glow-faint: rgba(189, 147, 249, 0.16);
+
+	/* Refonte structurelle : bordures fines, coins arrondis, ombres douces + néon */
+	--border-w: 2px;
+	--header-border-w: 2px;
+	--radius-panel: 14px;
+	--radius-control: 9px;
+	--radius-chip: 999px;
+	--rivets: none;
+	--scanline-alpha: 0.04;
+	--panel-clip: none;
+	--tab-clip: none;
+	--title-shadow: 0 2px 0 var(--bezel), 0 0 18px var(--glow-faint);
+	--panel-shadow: 0 14px 30px rgba(0, 0, 0, 0.42), 0 1px 0 rgba(255, 255, 255, 0.06) inset;
+	--panel-sunken-shadow: 0 3px 12px rgba(0, 0, 0, 0.38) inset;
+	--btn-shadow: 0 4px 0 0 var(--shadow), 0 9px 20px rgba(0, 0, 0, 0.42), 0 1px 0 rgba(255, 255, 255, 0.32) inset;
+	--btn-shadow-hover: 0 4px 0 0 var(--shadow), 0 9px 20px rgba(0, 0, 0, 0.42), 0 1px 0 rgba(255, 255, 255, 0.32) inset, 0 0 16px 0 var(--glow);
+	--btn-shadow-active: 0 4px 0 0 var(--shadow), 0 9px 20px rgba(0, 0, 0, 0.42), 0 1px 0 rgba(255, 255, 255, 0.32) inset, 0 0 18px 0 var(--glow);
+	--tab-shadow: 0 -2px 0 0 inset rgba(0, 0, 0, 0.35), 0 4px 12px rgba(0, 0, 0, 0.35);
+	--tab-shadow-hover: 0 -2px 0 0 inset rgba(0, 0, 0, 0.35), 0 4px 12px rgba(0, 0, 0, 0.35), 0 0 12px 0 var(--glow-faint);
+	--tab-shadow-active: 0 -2px 0 0 inset rgba(0, 0, 0, 0.25), 0 6px 16px rgba(0, 0, 0, 0.4), 0 0 18px 0 var(--glow);
+	--header-shadow: 0 8px 26px rgba(0, 0, 0, 0.5);
+	--playerbar-shadow: 0 -8px 26px rgba(0, 0, 0, 0.45);
+	--card-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+	--card-shadow-hover: 0 6px 16px rgba(0, 0, 0, 0.35), 0 0 14px 0 var(--glow-faint);
+	--art-shadow: 0 10px 22px rgba(0, 0, 0, 0.5);
+
+	/* Ciel nocturne : étoiles roses/cyan, halo de lune violet, lueur de ville en bas */
+	--scene:
+		radial-gradient(circle at 82% 12%, rgba(248, 248, 242, 0.12) 0px, transparent 2px),
+		radial-gradient(circle at 20% 18%, rgba(139, 233, 253, 0.14) 0px, transparent 2px),
+		radial-gradient(circle at 55% 8%, rgba(255, 121, 198, 0.12) 0px, transparent 2px),
+		radial-gradient(circle at 35% 30%, rgba(248, 248, 242, 0.07) 0px, transparent 1px),
+		radial-gradient(circle at 70% 26%, rgba(189, 147, 249, 0.12) 0px, transparent 2px),
+		radial-gradient(circle at 86% 14%, rgba(189, 147, 249, 0.2) 0%, transparent 16%),
+		radial-gradient(ellipse at 50% 120%, #2d2440 0%, transparent 62%),
+		linear-gradient(180deg, #191a21 0%, #21222c 55%, #282a36 100%);
+}
+
+:root {
+	--font-pixel: 'Pixelify Sans', 'Courier New', monospace;
+
+	/*
+	 * Variables de style STRUCTUREL (au-delà des couleurs). Les valeurs par défaut
+	 * reproduisent exactement le look pixel dur historique — seuls les thèmes qui
+	 * veulent une autre écriture visuelle (ex. nocturne) les redéfinissent.
+	 */
+	--border-w: 3px;
+	--header-border-w: 4px;
+	--radius-panel: 0px;
+	--radius-control: 0px;
+	--radius-chip: 0px;
+	--rivets: block;
+	--scanline-alpha: 0.09;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	margin: 0;
+	padding: 0;
+	color: var(--cream);
+	font-family: var(--font-pixel);
+	/* Anti « page fantôme » : aucun débordement horizontal ne doit créer de scroll latéral (mobile). */
+	overflow-x: hidden;
+	max-width: 100%;
+}
+
+/* Fond "nuit de gare" : ciel dégradé + étoiles clairsemées en radial-gradients + vignette.
+   Le décor complet est surchargeable par thème via --scene (cf. nocturne). */
+body {
+	min-height: 100vh;
+	background-color: var(--ink);
+	background-image: var(
+		--scene,
+		radial-gradient(circle at 18% 12%, var(--glow-faint) 0px, transparent 2px),
+		radial-gradient(circle at 74% 8%, rgba(255, 255, 255, 0.08) 0px, transparent 2px),
+		radial-gradient(circle at 42% 22%, rgba(255, 255, 255, 0.05) 0px, transparent 1px),
+		radial-gradient(circle at 88% 30%, var(--glow-faint) 0px, transparent 2px),
+		radial-gradient(circle at 8% 40%, rgba(255, 255, 255, 0.05) 0px, transparent 1px),
+		radial-gradient(ellipse at 50% 120%, var(--plum) 0%, transparent 60%),
+		linear-gradient(180deg, var(--ink) 0%, var(--plum-deep) 100%)
+	);
+	background-attachment: fixed;
+}
+
+/* Scanlines CRT très légères par-dessus tout, pour l'effet borne d'arcade. */
+.crt-overlay {
+	position: fixed;
+	inset: 0;
+	pointer-events: none;
+	z-index: 40;
+	background: repeating-linear-gradient(
+		0deg,
+		rgba(0, 0, 0, var(--scanline-alpha, 0.09)) 0px,
+		rgba(0, 0, 0, var(--scanline-alpha, 0.09)) 1px,
+		transparent 1px,
+		transparent 3px
+	);
+	mix-blend-mode: multiply;
+}
+
+/* Scanlines réutilisables pour les surfaces qui s'affichent AU-DESSUS de .crt-overlay
+   (plein écran « Lecture en cours », palette de commandes, superpositions de menu) : sans ça
+   ces surfaces échappaient à l'effet CRT global. À poser sur un conteneur positionné. */
+.scanlines::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	z-index: 5;
+	background: repeating-linear-gradient(
+		0deg,
+		rgba(0, 0, 0, var(--scanline-alpha, 0.09)) 0px,
+		rgba(0, 0, 0, var(--scanline-alpha, 0.09)) 1px,
+		transparent 1px,
+		transparent 3px
+	);
+	mix-blend-mode: multiply;
+}
+
+h1,
+h2,
+h3,
+h4 {
+	font-family: var(--font-pixel);
+	margin: 0;
+	color: var(--cream-bright);
+	text-shadow: var(--title-shadow, 2px 2px 0 var(--bezel));
+}
+
+button,
+input,
+select {
+	font-family: var(--font-pixel);
+}
+
+a {
+	color: var(--gold-bright);
+}
+
+/* ---- Panneau pixel : coins crantés (clip-path) + bevel clair/sombre + rivets ---- */
+
+.pixel-panel {
+	position: relative;
+	background:
+		linear-gradient(180deg, var(--panel-hi) 0%, var(--panel) 12%, var(--panel) 88%, var(--panel-lo) 100%);
+	border: var(--border-w, 3px) solid var(--bezel);
+	border-radius: var(--radius-panel, 0);
+	padding: 1.4rem;
+	clip-path: var(
+		--panel-clip,
+		polygon(
+			0 8px, 8px 8px, 8px 0,
+			calc(100% - 8px) 0, calc(100% - 8px) 8px, 100% 8px,
+			100% calc(100% - 8px), calc(100% - 8px) calc(100% - 8px), calc(100% - 8px) 100%,
+			8px 100%, 8px calc(100% - 8px), 0 calc(100% - 8px)
+		)
+	);
+	box-shadow: var(
+		--panel-shadow,
+		0 -4px 0 0 inset var(--shadow),
+		0 3px 0 0 inset rgba(255, 255, 255, 0.06)
+	);
+}
+
+/* Rivets aux quatre coins (masquables par thème via --rivets). */
+.pixel-panel::before,
+.pixel-panel::after {
+	content: '';
+	display: var(--rivets, block);
+	position: absolute;
+	width: 8px;
+	height: 8px;
+	background: var(--metal-mid);
+	box-shadow: 0 -2px 0 0 inset rgba(0, 0, 0, 0.55);
+	pointer-events: none;
+}
+
+.pixel-panel::before {
+	top: 10px;
+	left: 10px;
+}
+
+.pixel-panel::after {
+	top: 10px;
+	right: 10px;
+}
+
+.pixel-panel--sunken {
+	background: var(--plum-deep);
+	box-shadow: var(
+		--panel-sunken-shadow,
+		0 5px 0 0 inset rgba(0, 0, 0, 0.45),
+		0 -2px 0 0 inset rgba(255, 255, 255, 0.03)
+	);
+}
+
+.pixel-panel--sunken::before,
+.pixel-panel--sunken::after {
+	display: none;
+}
+
+@media (max-width: 600px) {
+	.pixel-panel {
+		padding: 0.9rem;
+	}
+}
+
+/* ---- Boutons ---- */
+
+.pixel-btn {
+	font-family: var(--font-pixel);
+	background: linear-gradient(180deg, var(--gold-bright) 0%, var(--gold) 55%, var(--rust) 160%);
+	color: var(--ink);
+	border: var(--border-w, 3px) solid var(--bezel);
+	border-radius: var(--radius-control, 0);
+	padding: 0.5rem 1rem;
+	font-size: 0.85rem;
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
+	cursor: pointer;
+	text-shadow: 0 1px 0 rgba(255, 255, 255, 0.3);
+	box-shadow: var(
+		--btn-shadow,
+		3px 4px 0 0 var(--shadow),
+		0 -4px 0 0 inset rgba(0, 0, 0, 0.25),
+		0 2px 0 0 inset rgba(255, 255, 255, 0.35)
+	);
+}
+
+.pixel-btn:hover:not(:disabled) {
+	filter: brightness(1.1);
+	box-shadow: var(
+		--btn-shadow-hover,
+		3px 4px 0 0 var(--shadow),
+		0 -4px 0 0 inset rgba(0, 0, 0, 0.25),
+		0 2px 0 0 inset rgba(255, 255, 255, 0.35),
+		0 0 12px 0 var(--glow)
+	);
+}
+
+.pixel-btn:active:not(:disabled) {
+	transform: translate(2px, 3px);
+	box-shadow:
+		1px 1px 0 0 var(--shadow),
+		0 3px 0 0 inset rgba(0, 0, 0, 0.3);
+}
+
+.pixel-btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.pixel-btn--ghost {
+	background: linear-gradient(180deg, var(--panel-hi) 0%, var(--panel) 60%, var(--panel-lo) 100%);
+	color: var(--cream);
+	border-color: var(--bezel);
+	text-shadow: 1px 1px 0 var(--bezel);
+}
+
+.pixel-btn--danger {
+	background: linear-gradient(180deg, var(--coral) 0%, var(--rust) 70%);
+	color: var(--cream-bright);
+	text-shadow: 1px 1px 0 var(--bezel);
+}
+
+/* ---- Boutons-catégories / sous-onglets (style de référence : Bibliothèque) ----
+ * Colorés par --accent (défaut : ambre), relief pixel 3D, halo à l'état actif,
+ * désaturés à l'état inactif, effet d'enfoncement au clic. Partagé par tous les
+ * panneaux pour uniformiser Radios / Podcasts / Bibliothèque. */
+
+.category-btn {
+	--accent: var(--gold-bright);
+	font-family: var(--font-pixel);
+	background: linear-gradient(180deg, var(--accent) 0%, var(--accent) 55%, rgba(0, 0, 0, 0.35) 200%);
+	color: var(--ink);
+	border: var(--border-w, 3px) solid var(--bezel);
+	border-radius: var(--radius-control, 0);
+	padding: 0.4rem 0.85rem;
+	font-size: 0.72rem;
+	text-transform: uppercase;
+	letter-spacing: 0.03em;
+	cursor: pointer;
+	text-shadow: 0 1px 0 rgba(255, 255, 255, 0.3);
+	box-shadow: var(
+		--btn-shadow,
+		3px 4px 0 0 var(--shadow),
+		0 -4px 0 0 inset rgba(0, 0, 0, 0.28),
+		0 2px 0 0 inset rgba(255, 255, 255, 0.3)
+	);
+}
+
+.category-btn:not(.is-active) {
+	filter: saturate(0.55) brightness(0.8);
+}
+
+.category-btn:hover:not(:disabled) {
+	filter: brightness(1.08);
+}
+
+.category-btn.is-active {
+	box-shadow: var(
+		--btn-shadow-active,
+		3px 4px 0 0 var(--shadow),
+		0 -4px 0 0 inset rgba(0, 0, 0, 0.28),
+		0 2px 0 0 inset rgba(255, 255, 255, 0.3),
+		0 0 14px 0 var(--glow)
+	);
+}
+
+.category-btn:active:not(:disabled) {
+	transform: translate(2px, 3px);
+	box-shadow: 1px 1px 0 0 var(--shadow);
+}
+
+.category-btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+@media (max-width: 600px) {
+	.category-btn {
+		padding: 0.35rem 0.6rem;
+		font-size: 0.66rem;
+		letter-spacing: 0.02em;
+	}
+}
+
+/* Confort tactile. Les réglages ci-dessus gardent les onglets compacts (c'est le but :
+   ils prenaient trop de place), mais au doigt une hauteur de ~24 px se rate. On élargit
+   donc la ZONE CLIQUABLE sans toucher à la typographie, et uniquement sur un pointeur
+   grossier : à la souris, l'aspect compact est conservé tel quel. */
+@media (hover: none) and (pointer: coarse) {
+	.category-btn {
+		min-height: 44px;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+	}
+}
+
+/* ---- Champs ---- */
+
+.pixel-input {
+	font-family: var(--font-pixel);
+	background: var(--plum-deep);
+	color: var(--cream-bright);
+	border: var(--border-w, 3px) solid var(--bezel);
+	border-radius: var(--radius-control, 0);
+	padding: 0.55rem 0.7rem;
+	width: 100%;
+	box-shadow:
+		0 4px 0 0 inset rgba(0, 0, 0, 0.4),
+		0 -1px 0 0 inset rgba(255, 255, 255, 0.05);
+}
+
+.pixel-input:focus {
+	outline: none;
+	border-color: var(--gold);
+	box-shadow:
+		0 4px 0 0 inset rgba(0, 0, 0, 0.4),
+		0 0 10px 0 var(--glow);
+}
+
+.pixel-input::placeholder {
+	color: var(--metal-mid);
+}
+
+/* ---- Étiquette-cartouche ---- */
+
+.label-tag {
+	display: inline-block;
+	font-size: 0.68rem;
+	letter-spacing: 0.16em;
+	text-transform: uppercase;
+	color: var(--gold-bright);
+	background: var(--ink);
+	border: 2px solid var(--bezel);
+	border-radius: var(--radius-chip, 0);
+	padding: 0.18rem 0.55rem;
+	box-shadow:
+		0 -2px 0 0 inset rgba(0, 0, 0, 0.5),
+		0 0 6px 0 var(--glow-faint);
+	text-shadow: 0 0 6px var(--glow);
+}
+
+/* ---- Sliders (volume) ---- */
+
+input[type='range'] {
+	appearance: none;
+	-webkit-appearance: none;
+	height: 0.9rem;
+	background: repeating-linear-gradient(90deg, var(--plum) 0 8px, var(--plum-deep) 8px 16px);
+	border: var(--border-w, 3px) solid var(--bezel);
+	border-radius: var(--radius-chip, 0);
+	box-shadow: 0 -3px 0 0 inset rgba(0, 0, 0, 0.35);
+	cursor: pointer;
+}
+
+input[type='range']::-webkit-slider-thumb {
+	appearance: none;
+	-webkit-appearance: none;
+	width: 1rem;
+	height: 1.3rem;
+	background: linear-gradient(180deg, var(--gold-bright), var(--gold));
+	border: var(--border-w, 3px) solid var(--bezel);
+	border-radius: var(--radius-control, 0);
+	box-shadow: 0 -3px 0 0 inset rgba(0, 0, 0, 0.3);
+}
+
+input[type='range']::-moz-range-thumb {
+	width: 1rem;
+	height: 1.3rem;
+	border-radius: var(--radius-control, 0);
+	background: linear-gradient(180deg, var(--gold-bright), var(--gold));
+	border: var(--border-w, 3px) solid var(--bezel);
+	box-shadow: 0 -3px 0 0 inset rgba(0, 0, 0, 0.3);
+}
+
+/* ---- Scrollbar assortie ---- */
+
+::-webkit-scrollbar {
+	width: 12px;
+	height: 12px;
+}
+
+::-webkit-scrollbar-track {
+	background: var(--plum-deep);
+	border-left: 2px solid var(--bezel);
+}
+
+::-webkit-scrollbar-thumb {
+	background: linear-gradient(180deg, var(--metal-mid), var(--metal-dark));
+	border: 2px solid var(--bezel);
+}
+
+.visually-hidden {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+}

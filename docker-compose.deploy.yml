@@ -1,0 +1,31 @@
+# Deploiement de Tentacle a partir de l'image publiee sur le registre Gitea.
+# (Ne build pas : tire l'image construite par la CI Gitea Actions.)
+#
+# Usage :
+#   docker login <ton-registre>          # si le registre est prive
+#   docker compose -f docker-compose.deploy.yml up -d
+#   # Mise a jour :
+#   docker compose -f docker-compose.deploy.yml pull && \
+#     docker compose -f docker-compose.deploy.yml up -d
+
+services:
+  tentacle:
+    image: ${TENTACLE_IMAGE:?Definis TENTACLE_IMAGE (ex. registre.exemple.fr/utilisateur/tentacle:latest) — voir .env.example}
+    container_name: tentacle
+    restart: unless-stopped
+    pull_policy: always
+    environment:
+      # Origine publique de l'app. OBLIGATOIRE derriere un reverse proxy pour que
+      # la connexion (POST) fonctionne. Ex : https://tentacle.exemple.fr
+      ORIGIN: ${ORIGIN:-http://localhost:8080}
+      # Secret de signature des sessions (openssl rand -hex 32). Recommande.
+      AUTH_SECRET: ${AUTH_SECRET:-}
+      # Optionnel : jeton exige pour creer l'admin sur /setup (vide = ouvert).
+      SETUP_TOKEN: ${SETUP_TOKEN:-}
+    volumes:
+      - tentacle-data:/data
+    ports:
+      - "8080:3000"
+
+volumes:
+  tentacle-data:

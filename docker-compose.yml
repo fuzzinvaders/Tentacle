@@ -1,0 +1,27 @@
+services:
+  tentacle:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: tentacle:latest
+    container_name: tentacle
+    restart: unless-stopped
+    environment:
+      # Origine publique de l'app. OBLIGATOIRE derriere un reverse proxy pour que
+      # la connexion (POST) fonctionne. En local : http://localhost:8080.
+      ORIGIN: ${ORIGIN:-http://localhost:8080}
+      # Secret de signature des sessions. Recommande de le definir (openssl rand -hex 32) ;
+      # sinon un secret aleatoire est genere et persiste dans le volume de donnees.
+      AUTH_SECRET: ${AUTH_SECRET:-}
+      # Optionnel : si defini, la creation de l'admin sur /setup exige ce jeton
+      # (protege une instance exposee avant sa configuration). Vide = /setup ouvert.
+      SETUP_TOKEN: ${SETUP_TOKEN:-}
+    volumes:
+      # Persiste les comptes utilisateurs (et le secret genere).
+      - tentacle-data:/data
+    ports:
+      # host:container — l'app ecoute sur 3000 dans le conteneur.
+      - "8080:3000"
+
+volumes:
+  tentacle-data:

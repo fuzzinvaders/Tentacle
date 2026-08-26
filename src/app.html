@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="fr">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+		<meta name="text-scale" content="scale" />
+		<meta name="description" content="Un client audio pixel art qui unifie Jellyfin, radios et podcasts." />
+
+		<!-- PWA : installée depuis la version web, l'app s'ouvre en plein écran (display
+		     standalone) sans barre d'URL ni menu du navigateur. viewport-fit=cover +
+		     les insets safe-area (voir app.css) gèrent les encoches / barre d'état. -->
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<meta name="theme-color" content="#0d1b1e" />
+		<meta name="mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+		<meta name="apple-mobile-web-app-title" content="Tentacle" />
+		<link rel="apple-touch-icon" href="/icon-192.png" />
+
+		<link rel="preload" href="/fonts/pixelify-sans-variable.ttf" as="font" type="font/ttf" crossorigin="anonymous" />
+		%sveltekit.head%
+	</head>
+	<body data-sveltekit-preload-data="hover">
+		<div style="display: contents">%sveltekit.body%</div>
+	</body>
+</html>

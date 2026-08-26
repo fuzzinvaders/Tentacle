@@ -1,0 +1,89 @@
+name: Build & publish Docker image
+
+# Build l'image Docker et la pousse vers le registre de conteneurs Gitea.
+# - push sur main            -> tag "latest" (+ tag court du commit)
+# - push d'un tag vX.Y.Z     -> tags "X.Y.Z" et "X.Y"
+#
+# Prerequis :
+#   * un runner Gitea Actions actif et enregistre sur l'instance (voir wiki :
+#     "CI - Runner Gitea Actions")
+#   * le registre de paquets/conteneurs active sur ton instance
+#   * authentification du push : par defaut le token automatique du job
+#     (packages: write). Si ton instance ne l'accorde pas, definis deux secrets
+#     de depot REGISTRY_USER (ton identifiant Gitea) et REGISTRY_TOKEN (un PAT
+#     avec le scope write:package) : le workflow les utilisera en priorite.
+#
+# Ni l'hote ni le nom du depot ne sont ecrits en dur : le registre est deduit de
+# l'instance qui execute le workflow (variable de depot REGISTRY pour forcer une
+# autre valeur), et le nom d'image du depot lui-meme. Le fichier reste donc
+# valable sur n'importe quelle instance, sans donnee personnelle.
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Registre : variable de depot REGISTRY si definie, sinon l'hote de l'instance
+      # courante (GITHUB_SERVER_URL vaut l'URL du Gitea qui execute le job).
+      # Nom d'image : le depot lui-meme, en minuscules (Docker l'impose).
+      - name: Resolve registry and image name
+        run: |
+          REG="${{ vars.REGISTRY }}"
+          if [ -z "$REG" ]; then REG="${GITHUB_SERVER_URL#*://}"; fi
+          echo "REGISTRY=$REG" >> "$GITHUB_ENV"
+          echo "IMAGE_NAME=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
+          echo "Registre : $REG"
+
+      - name: Log in to Gitea container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          # Secrets dedies si presents, sinon token automatique du job.
+          username: ${{ secrets.REGISTRY_USER || github.actor }}
+          password: ${{ secrets.REGISTRY_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=short,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      # build/push Docker classique (via le daemon de l'hote partage au runner) :
+      # plus robuste que buildx sur un act_runner que le pipeline GitHub habituel.
+      - name: Build and push
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+          # Builder classique (pas BuildKit) : evite l'echec "git rev-parse
+          # --is-inside-work-tree" de la provenance BuildKit dans le conteneur
+          # de job (ownership git). Aucune fonctionnalite BuildKit n'est requise
+          # ici (multi-stage et COPY --from marchent avec le builder classique).
+          DOCKER_BUILDKIT: '0'
+        run: |
+          set -e
+          ARGS=$(printf '%s\n' "$TAGS" | sed '/^$/d' | sed 's/^/-t /' | tr '\n' ' ')
+          echo "Tags : $ARGS"
+          # Metadonnees de version affichees dans l'app (git dispo ici, sur le
+          # runner ; absent dans le conteneur de build -> on les passe en build-arg).
+          SOURCE_COMMIT=$(git rev-parse --short HEAD)
+          SOURCE_DATE=$(date -u +%Y-%m-%d)
+          echo "Version : $SOURCE_COMMIT ($SOURCE_DATE)"
+          docker build $ARGS \
+            --build-arg SOURCE_COMMIT="$SOURCE_COMMIT" \
+            --build-arg SOURCE_DATE="$SOURCE_DATE" \
+            -f Dockerfile .
+          printf '%s\n' "$TAGS" | sed '/^$/d' | while IFS= read -r t; do docker push "$t"; done

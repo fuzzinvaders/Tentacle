@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        Fond de fenêtre. En mode edge-to-edge imposé (targetSdk 36), la WebView est encartée
+        sous les barres système : les bandes ainsi libérées en haut et en bas laissent voir le
+        fond de FENÊTRE, pas la page web. Sans couleur ici, ces bandes apparaîtraient noires
+        (ou blanches) et trancheraient avec l'interface.
+
+        Valeur = la variable CSS "ink" du thème « terminus » (le thème par défaut de l'app).
+        Les deux autres thèmes sont également sombres, donc le raccord reste discret.
+    -->
+    <color name="tentacleInk">#0d1b1e</color>
+</resources>

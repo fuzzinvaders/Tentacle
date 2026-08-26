@@ -1,0 +1,31 @@
+# Runner Gitea Actions (act_runner) pour ce depot.
+# A lancer sur une machine avec Docker installe (idealement le serveur Gitea
+# lui-meme, ou toute machine ayant acces reseau a l instance).
+#
+# Usage :
+#   1. Recupere un token d'enregistrement (voir wiki : CI - Runner Gitea Actions).
+#   2. RUNNER_TOKEN=xxxxx docker compose -f ci/act-runner-compose.yml up -d
+#
+# Le token n'est utilise qu'a la premiere inscription (ecrit dans ./data/.runner) ;
+# tu peux le laisser vide ensuite, ou l'enlever de l'environnement.
+
+services:
+  runner:
+    image: gitea/act_runner:latest
+    container_name: tentacle-ci-runner
+    restart: unless-stopped
+    environment:
+      GITEA_INSTANCE_URL: ${GITEA_INSTANCE_URL:?Definis l URL de ton instance Gitea}
+      GITEA_RUNNER_REGISTRATION_TOKEN: ${RUNNER_TOKEN:-}
+      GITEA_RUNNER_NAME: tentacle-runner
+      # Le workflow declare "runs-on: ubuntu-latest" -> on mappe ce label vers
+      # une image Docker existante (image communautaire equipee pour les Actions).
+      GITEA_RUNNER_LABELS: ubuntu-latest:docker://ghcr.io/catthehacker/ubuntu:act-latest
+    volumes:
+      - ./data:/data
+      # Necessaire : docker/build-push-action lance "docker buildx build" DANS le
+      # conteneur de job, qui a besoin d'un docker fonctionnel -> on partage celui
+      # du serveur hote via ce socket (voir config.yaml : container.options).
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./act-runner-config.yaml:/config.yaml
+    command: ["daemon", "--config", "/config.yaml"]

@@ -1,0 +1,51 @@
+# Exemple de deploiement de Tentacle derriere un reverse proxy Traefik
+# (reseau Docker externe partage, decouverte automatique par labels).
+#
+# A adapter avant usage :
+#   - ${DOMAIN}            : ton nom de domaine (ex. tentacle.exemple.fr)
+#   - proxy (reseau)       : le nom du reseau Docker externe sur lequel Traefik ecoute
+#   - entrypoints=websecure : adapte au nom de ton entrypoint HTTPS Traefik
+#   - certresolver         : ajoute si tu utilises la resolution ACME de Traefik
+#
+# Usage :
+#   docker network create proxy   # si le reseau n'existe pas encore
+#   DOMAIN=tentacle.exemple.fr docker compose -f docker-compose.traefik.yml up -d
+#   # Mise a jour :
+#   docker compose -f docker-compose.traefik.yml pull && \
+#     docker compose -f docker-compose.traefik.yml up -d
+
+services:
+  tentacle:
+    image: ${TENTACLE_IMAGE:?Definis TENTACLE_IMAGE (ex. registre.exemple.fr/utilisateur/tentacle:latest) — voir .env.example}
+    container_name: tentacle
+    restart: unless-stopped
+    pull_policy: always
+    environment:
+      # Origine publique EXACTE de l'app (schema + domaine) : obligatoire pour
+      # que la connexion (POST) ne soit pas rejetee comme CSRF.
+      ORIGIN: https://${DOMAIN:?Definis DOMAIN=ton-domaine.tld}
+      # Secret de signature des sessions (openssl rand -hex 32). Recommande.
+      AUTH_SECRET: ${AUTH_SECRET:-}
+      # Optionnel : jeton exige pour creer l'admin sur /setup (vide = ouvert).
+      SETUP_TOKEN: ${SETUP_TOKEN:-}
+    volumes:
+      - tentacle-data:/data
+    # Pas de "ports:" ici : Traefik route le trafic via le reseau partage,
+    # pas besoin d'exposer le port sur l'hote.
+    networks:
+      - proxy
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      - traefik.http.routers.tentacle.rule=Host(`${DOMAIN}`)
+      - traefik.http.routers.tentacle.entrypoints=websecure
+      - traefik.http.routers.tentacle.tls=true
+      # - traefik.http.routers.tentacle.tls.certresolver=letsencrypt
+      - traefik.http.services.tentacle.loadbalancer.server.port=3000
+
+volumes:
+  tentacle-data:
+
+networks:
+  proxy:
+    external: true
