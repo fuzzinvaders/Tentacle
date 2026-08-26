@@ -40,6 +40,9 @@ jobs:
           # `github.sha` est le SHA long, d'où le calcul ici.
           echo "SOURCE_COMMIT=$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
           echo "SOURCE_DATE=$(date -u +%Y-%m-%d)" >> "$GITHUB_ENV"
+          # Trace lisible dans le journal, comme le fait le workflow Gitea : sans elle, une
+          # métadonnée de version erronée ne se verrait qu'une fois l'image déployée.
+          echo "Image ghcr.io/$OWNER/tentacle - version $(git rev-parse --short HEAD) ($(date -u +%Y-%m-%d))"
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
