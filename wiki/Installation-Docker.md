@@ -292,17 +292,20 @@ Ajoute simplement à ton `.env` :
 DEMO_MODE=1
 ```
 
-L'application affiche alors un bandeau proposant de **charger un petit catalogue d'exemple**
-(3 albums, pochettes générées, audio de synthèse) : tout le lecteur, la file d'attente et les écrans
-deviennent explorables sans rien installer. Le mode démonstration n'est jamais imposé — une
-connexion Jellyfin existante n'est pas touchée, et le visiteur peut refuser.
+Un compte **`demo` / `demo`** devient alors utilisable pour se connecter — aucun compte à créer
+côté admin, aucun identifiant à distribuer soi-même. Ce compte n'existe que tant que `DEMO_MODE`
+est actif (le désactiver invalide instantanément toute session ouverte avec), n'est jamais écrit
+dans `users.json` (il n'apparaît donc pas dans la gestion des comptes), et n'a jamais de droit
+administrateur.
 
-⚠️ Deux précautions pour une instance exposée à Internet :
+Une fois connecté, l'application affiche un bandeau proposant de **charger un petit catalogue
+d'exemple** (3 albums, pochettes générées, audio de synthèse) : tout le lecteur, la file d'attente
+et les écrans deviennent explorables sans rien installer. Le mode démonstration n'est jamais
+imposé — une connexion Jellyfin existante n'est pas touchée, et le visiteur peut refuser.
 
-- **Renseigne `SETUP_TOKEN`.** Sans lui, le premier visiteur qui trouve `/setup` crée le compte
-  administrateur.
-- **Crée le compte de démonstration toi-même**, puis communique ses identifiants (par exemple dans
-  la description de ton dépôt). Les visiteurs se connectent avec ce compte plutôt que d'en créer un.
+⚠️ **Renseigne `SETUP_TOKEN`** pour une instance exposée à Internet. Sans lui, le premier visiteur
+qui trouve `/setup` crée le compte administrateur (`demo`/`demo` n'y échappe pas : c'est un compte
+séparé, sans lien avec l'admin de l'instance).
 
 Le catalogue de démonstration est purement local au navigateur : aucune donnée n'est écrite côté
 serveur, et l'audio est synthétisé à la volée (une note par titre — les enchaînements et les fondus

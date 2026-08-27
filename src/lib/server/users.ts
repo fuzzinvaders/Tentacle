@@ -28,6 +28,29 @@ type Store = {
 const DATA_DIR = env.DATA_DIR || '.data';
 const DATA_FILE = join(DATA_DIR, 'users.json');
 
+/** `DEMO_MODE=1` : instance vitrine, voir aussi +layout.server.ts. */
+export function isDemoModeEnabled(): boolean {
+	return env.DEMO_MODE === '1' || env.DEMO_MODE === 'true';
+}
+
+// Identifiant "demo" / mot de passe "demo", uniquement quand DEMO_MODE est actif — pour une
+// instance vitrine sans compte à créer. Jamais persisté dans users.json : l'identifiant est
+// public par construction, ça n'a pas sa place sur disque, et ça le fait disparaître
+// automatiquement de la gestion des comptes admin (listUsers ne lit que le fichier).
+// Sans droit admin, et invalidé de lui-même si DEMO_MODE est désactivé après coup (voir
+// findById) : une session démo déjà ouverte ne survit pas à la désactivation.
+const DEMO_ACCOUNT_ID = 'demo-account';
+
+function demoUser(): User {
+	return {
+		id: DEMO_ACCOUNT_ID,
+		username: 'demo',
+		passwordHash: '',
+		isAdmin: false,
+		createdAt: '1970-01-01T00:00:00.000Z'
+	};
+}
+
 function readStore(): Store {
 	if (!existsSync(DATA_FILE)) return { users: [] };
 	try {
@@ -66,6 +89,7 @@ export function findByUsername(username: string): User | undefined {
 }
 
 export function findById(id: string): User | undefined {
+	if (id === DEMO_ACCOUNT_ID) return isDemoModeEnabled() ? demoUser() : undefined;
 	return readStore().users.find((x) => x.id === id);
 }
 
@@ -75,6 +99,10 @@ export function createUser(username: string, password: string, isAdmin: boolean)
 	const name = username.trim();
 	if (name.length < 2) return { ok: false, error: "Nom d'utilisateur trop court (2 caractères min)." };
 	if (password.length < 6) return { ok: false, error: 'Mot de passe trop court (6 caractères min).' };
+	// Réservé au compte de démonstration virtuel (voir demoUser) — y compris quand DEMO_MODE
+	// est actuellement désactivé, pour qu'un compte réel créé maintenant ne soit pas plus
+	// tard masqué par le raccourci demo/demo si DEMO_MODE est activé ensuite.
+	if (name.toLowerCase() === 'demo') return { ok: false, error: 'Identifiant réservé.' };
 	const store = readStore();
 	if (store.users.some((u) => u.username.toLowerCase() === name.toLowerCase())) {
 		return { ok: false, error: 'Cet identifiant existe déjà.' };
@@ -113,6 +141,9 @@ export function deleteUser(id: string): void {
 
 /** Verifies credentials; returns the user on success. */
 export function authenticate(username: string, password: string): User | null {
+	if (isDemoModeEnabled() && username.trim().toLowerCase() === 'demo' && password === 'demo') {
+		return demoUser();
+	}
 	const user = findByUsername(username);
 	if (!user) return null;
 	return verifyPassword(password, user.passwordHash) ? user : null;

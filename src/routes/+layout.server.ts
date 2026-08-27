@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { env } from '$env/dynamic/private';
+import { isDemoModeEnabled } from '$lib/server/users';
 import type { LayoutServerLoad } from './$types';
 
 // Expose l'utilisateur courant au client (badge, déconnexion, section admin), et le drapeau
@@ -12,6 +12,6 @@ import type { LayoutServerLoad } from './$types';
 export const load: LayoutServerLoad = async ({ locals }) => {
 	return {
 		user: locals.user,
-		demoMode: env.DEMO_MODE === '1' || env.DEMO_MODE === 'true'
+		demoMode: isDemoModeEnabled()
 	};
 };
