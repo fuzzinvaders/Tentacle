@@ -284,7 +284,7 @@ ensuite le nom de ce resolver (`ovh`, pas `letsencrypt`).
 ## Instance de démonstration
 
 Une instance **vitrine**, publique, où les visiteurs n'ont aucun serveur Jellyfin à connecter —
-c'est ce qui tourne sur <https://tentacle.fuzzonaut.space>.
+c'est ce qui tourne sur <https://tentacle.fuzzinvaders.space>.
 
 Ajoute simplement à ton `.env` :
 

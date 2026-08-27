@@ -5,7 +5,7 @@ pour ta bibliothèque musicale, tes podcasts, tes radios et tes fichiers locaux.
 
 Auto-hébergeable via Docker, ou installable en application Android.
 
-**▶️ Démonstration en ligne : <https://tentacle.fuzzonaut.space>** — un petit catalogue d'exemple,
+**▶️ Démonstration en ligne : <https://tentacle.fuzzinvaders.space>** — un petit catalogue d'exemple,
 jouable, pour faire le tour de l'interface sans rien installer ni connecter.
 
 ## Sources réunies
