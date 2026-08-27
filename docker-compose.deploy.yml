@@ -24,6 +24,8 @@ services:
       AUTH_SECRET: ${AUTH_SECRET:-}
       # Optionnel : jeton exige pour creer l'admin sur /setup (vide = ouvert).
       SETUP_TOKEN: ${SETUP_TOKEN:-}
+      # Optionnel : instance vitrine, propose le catalogue de demo (voir .env.example).
+      DEMO_MODE: ${DEMO_MODE:-0}
     volumes:
       - tentacle-data:/data
     ports:
