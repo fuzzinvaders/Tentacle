@@ -17,6 +17,7 @@
 	import AccountSettings from '$lib/components/config/AccountSettings.svelte';
 	import { localFiles } from '$lib/stores/localFiles.svelte';
 	import { page } from '$app/state';
+	import { DEMO_ACCOUNT_ID } from '$lib/demo';
 	import { pinepods } from '$lib/stores/pinepods.svelte';
 	import { jellyfin } from '$lib/stores/jellyfin.svelte';
 	import { listenbrainz } from '$lib/stores/listenbrainz.svelte';
@@ -77,7 +78,7 @@
 	];
 </script>
 
-{#if page.data.user}
+{#if page.data.user && page.data.user.id !== DEMO_ACCOUNT_ID}
 	<AccountSettings />
 {/if}
 
@@ -414,10 +415,12 @@
 	<DiagnosticsPanel />
 </PixelPanel>
 
-<PixelPanel sunken>
-	<h3>Mode démonstration</h3>
-	<DemoModeToggle />
-</PixelPanel>
+{#if page.data.user?.id !== DEMO_ACCOUNT_ID}
+	<PixelPanel sunken>
+		<h3>Mode démonstration</h3>
+		<DemoModeToggle />
+	</PixelPanel>
+{/if}
 
 <style>
 	h3 {

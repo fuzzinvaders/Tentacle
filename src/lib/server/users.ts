@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { env } from '$env/dynamic/private';
 import { hashPassword, verifyPassword } from '$lib/server/password';
+import { DEMO_ACCOUNT_ID } from '$lib/demo';
 
 export type User = {
 	id: string;
@@ -39,7 +40,9 @@ export function isDemoModeEnabled(): boolean {
 // automatiquement de la gestion des comptes admin (listUsers ne lit que le fichier).
 // Sans droit admin, et invalidé de lui-même si DEMO_MODE est désactivé après coup (voir
 // findById) : une session démo déjà ouverte ne survit pas à la désactivation.
-const DEMO_ACCOUNT_ID = 'demo-account';
+// DEMO_ACCOUNT_ID vit dans $lib/demo (pas ici) : le client en a aussi besoin, pour savoir sans
+// appel serveur que l'utilisateur connecté EST ce compte (auto-activation, masquage de
+// réglages — voir +layout.svelte et ConfigPanel.svelte).
 
 function demoUser(): User {
 	return {

@@ -43,6 +43,8 @@
 	import DemoInvite from '$lib/components/shared/DemoInvite.svelte';
 	import ContextMenu from '$lib/components/shared/ContextMenu.svelte';
 	import { toasts } from '$lib/stores/toasts.svelte';
+	import { DEMO_ACCOUNT_ID, isDemoExternalTrack } from '$lib/demo';
+	import { activateDemoMode } from '$lib/demoActivation';
 	import { loadProfile, buildProfile, scheduleSave, clearLocalProfile, hydrateFromLocalStorage, syncState } from '$lib/profileSync.svelte';
 	import type { LayoutData } from './$types';
 
@@ -261,6 +263,14 @@
 	// jour de Svelte (effect_update_depth_exceeded), plantant la navigation
 	// juste après la création de l'admin (page figée nécessitant un rechargement).
 	let cleared = false;
+	// Compte demo/demo : le mode démonstration s'active tout seul, sans passer par le bandeau
+	// (voir DemoInvite.svelte) — ce compte N'EXISTE que pour ça, pas de geste supplémentaire à
+	// demander. activateDemoMode() est idempotent (no-op si déjà actif), donc sûr à chaque
+	// ré-exécution de cet effect.
+	$effect(() => {
+		if (data.user?.id === DEMO_ACCOUNT_ID) activateDemoMode();
+	});
+
 	$effect(() => {
 		if (data.user && !profileInit) {
 			profileInit = true;
@@ -355,14 +365,19 @@
 	// l'EQ reste désactivé, activeEl === audioEl et le comportement est identique à avant.
 	let activeEl = $state<HTMLAudioElement | undefined>();
 
-	function eqEligible(source?: string): boolean {
-		return source === 'jellyfin' || source === 'local';
+	function eqEligible(source?: string, id?: string): boolean {
+		if (source !== 'jellyfin' && source !== 'local') return false;
+		// Cas particulier de la démo : une piste « Jellyfin » qui pointe en réalité vers un
+		// fichier distant réel (sans CORS, voir demo.ts) doit être exclue exactement comme les
+		// radios/podcasts le sont déjà, sinon crossOrigin="anonymous" échoue silencieusement.
+		const rawId = id?.startsWith('jellyfin-') ? id.slice('jellyfin-'.length) : id;
+		return !(rawId && isDemoExternalTrack(rawId));
 	}
 	// Le graphe Web Audio doit-il traiter le titre courant ? (égaliseur OU normalisation activés,
 	// et source compatible CORS : Jellyfin/local).
 	const graphActive = $derived(
 		(settings.values.eqEnabled || settings.values.volumeNormalization) &&
-			eqEligible(player.current?.source)
+			eqEligible(player.current?.source, player.current?.id)
 	);
 
 	// ---- Graphe Web Audio (créé paresseusement) : source → filtres EQ → préampli → sortie ----
@@ -453,7 +468,7 @@
 		const remaining = dur - el.currentTime;
 		if (remaining > xf || remaining <= 0.25) return;
 		const next = player.queue[player.currentIndex + 1];
-		if (!next || !eqEligible(next.source)) return; // suivant séquentiel, musique/local
+		if (!next || !eqEligible(next.source, next.id)) return; // suivant séquentiel, musique/local
 		startCrossfade(el, next, xf);
 	}
 
@@ -1527,7 +1542,7 @@
 		{:else}
 			<!-- Instance vitrine (DEMO_MODE=1) : proposer le catalogue d'exemple plutôt qu'un
 			     écran « relie une source » à un visiteur qui n'a aucun serveur. -->
-			<DemoInvite enabled={Boolean(data.demoMode)} />
+			<DemoInvite enabled={Boolean(data.demoMode) && data.user?.id !== DEMO_ACCOUNT_ID} />
 			{@render children()}
 		{/if}
 	</main>

@@ -1,19 +1,19 @@
 <script lang="ts">
 	// SPDX-License-Identifier: AGPL-3.0-or-later
 	import { jellyfin } from '$lib/stores/jellyfin.svelte';
-	import { localPodcasts } from '$lib/stores/localPodcasts.svelte';
-	import { radios } from '$lib/stores/radios.svelte';
-	import { settings } from '$lib/stores/settings.svelte';
-	import { DEMO_BASE_URL, DEMO_USER_ID, demoPodcastFeeds, demoRadios, isDemo } from '$lib/demo';
+	import { isDemo } from '$lib/demo';
+	import { activateDemoMode } from '$lib/demoActivation';
 	import { toasts } from '$lib/stores/toasts.svelte';
 
 	/**
-	 * Invitation au mode démonstration, sur une instance vitrine (`DEMO_MODE=1`).
+	 * Invitation au mode démonstration, sur une instance vitrine (`DEMO_MODE=1`), pour un
+	 * visiteur qui se connecte avec SON PROPRE compte (pas demo/demo — ce compte-là active tout
+	 * automatiquement, voir +layout.svelte, et n'affiche jamais ce bandeau).
 	 *
-	 * Un visiteur qui découvre l'application n'a aucun serveur Jellyfin à connecter : sans cela il
-	 * ne verrait qu'un écran « relie une source ». On lui propose donc le catalogue de
-	 * démonstration — d'un seul clic, et jamais d'autorité : une connexion existante n'est pas
-	 * touchée, et le bandeau se referme.
+	 * Un tel visiteur n'a aucun serveur Jellyfin à connecter : sans cela il ne verrait qu'un
+	 * écran « relie une source ». On lui propose donc le catalogue de démonstration — d'un seul
+	 * clic, et jamais d'autorité : une connexion existante n'est pas touchée, et le bandeau se
+	 * referme.
 	 */
 	let { enabled }: { enabled: boolean } = $props();
 
@@ -21,18 +21,7 @@
 	const visible = $derived(enabled && !dismissed && !jellyfin.connected && !isDemo(jellyfin.connection));
 
 	function activate() {
-		jellyfin.connect({
-			baseUrl: DEMO_BASE_URL,
-			token: 'demo',
-			userId: DEMO_USER_ID,
-			serverName: 'Démonstration'
-		});
-		// Podcasts et radios n'ont pas de notion de connexion à part (voir demo.ts) : on peuple
-		// directement leurs stores, comme le ferait un visiteur qui viendrait de s'abonner/ajouter
-		// ces éléments lui-même.
-		settings.set('podcastSource', 'local');
-		for (const { podcastId, meta } of demoPodcastFeeds()) localPodcasts.upsert(podcastId, meta);
-		for (const station of demoRadios()) radios.add(station);
+		activateDemoMode();
 		toasts.info('Mode démonstration activé.');
 	}
 </script>

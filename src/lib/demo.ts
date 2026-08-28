@@ -24,6 +24,12 @@ import type { LocalFeedMeta } from '$lib/stores/localPodcasts.svelte';
 export const DEMO_BASE_URL = 'demo://tentacle';
 export const DEMO_USER_ID = 'demo-user';
 
+/** Identifiant de session du compte de connexion `demo`/`demo` (voir server/users.ts). Vit ici,
+ * dans un module sans dépendance serveur, pour être importable aussi bien côté client (savoir
+ * si l'utilisateur connecté EST ce compte) que côté serveur (l'authentifier) — un module sous
+ * `$lib/server/` ne peut jamais être importé depuis du code client. */
+export const DEMO_ACCOUNT_ID = 'demo-account';
+
 export function isDemo(conn: { baseUrl: string } | null | undefined): boolean {
 	return conn?.baseUrl === DEMO_BASE_URL;
 }
@@ -32,7 +38,9 @@ const TICKS_PER_SEC = 10_000_000;
 /** Marqueur d'image : sa seule présence fait demander la pochette par les composants. */
 const DEMO_IMAGE_TAG = 'demo';
 
-type DemoTrackSpec = { title: string; seconds: number; hz: number };
+// `url` : piste réelle (fichier distant), lue telle quelle sans synthèse — voir demoStreamUrl.
+// Absent : piste fictive, synthétisée en WAV à partir de `hz` (voir makeWav plus bas).
+type DemoTrackSpec = { title: string; seconds: number; hz: number; url?: string };
 type DemoAlbumSpec = {
 	id: string;
 	name: string;
@@ -84,6 +92,39 @@ const ALBUMS: DemoAlbumSpec[] = [
 			{ title: 'Ventouses', seconds: 33, hz: 349 },
 			{ title: 'Abysses', seconds: 56, hz: 147 },
 			{ title: 'Rejet d’encre', seconds: 40, hz: 392 }
+		]
+	},
+	{
+		// Seul album « réel » du catalogue de démo : trois pistes effectivement libres de droits
+		// (Kevin MacLeod, incompetech.com, licence Creative Commons BY 3.0 — nécessite crédit,
+		// donné ici même dans le champ artiste puisqu'il est affiché partout où l'album l'est).
+		// Fichiers distants, pas de synthèse (voir `url` sur DemoTrackSpec) : seul cas de la démo
+		// qui dépend du réseau, comme les radios.
+		id: 'demo-album-4',
+		name: 'Musique libre (CC BY 3.0)',
+		artist: 'Kevin MacLeod — incompetech.com',
+		year: 2023,
+		genre: 'Musique libre',
+		hue: 45,
+		tracks: [
+			{
+				title: 'Morning',
+				seconds: 153,
+				hz: 0,
+				url: 'https://incompetech.com/music/royalty-free/mp3-royaltyfree/Morning.mp3'
+			},
+			{
+				title: 'Evening',
+				seconds: 186,
+				hz: 0,
+				url: 'https://incompetech.com/music/royalty-free/mp3-royaltyfree/Evening.mp3'
+			},
+			{
+				title: 'Southern Gothic',
+				seconds: 147,
+				hz: 0,
+				url: 'https://incompetech.com/music/royalty-free/mp3-royaltyfree/Southern%20Gothic.mp3'
+			}
 		]
 	}
 ];
@@ -380,10 +421,13 @@ const streamCache = new Map<string, string>();
  * fondus — ce qui est exactement ce qu'il faut pour vérifier le lecteur.
  */
 export function demoStreamUrl(itemId: string): string {
+	const spec = findTrackSpec(itemId);
+	// Piste réelle : servie telle quelle, jamais mise en cache d'objet (ce n'est pas un blob
+	// créé ici, rien à révoquer).
+	if (spec.url) return spec.url;
+
 	const cached = streamCache.get(itemId);
 	if (cached) return cached;
-
-	const spec = findTrackSpec(itemId);
 	const url = URL.createObjectURL(makeWav(spec.seconds, spec.hz));
 	streamCache.set(itemId, url);
 	return url;
@@ -398,6 +442,17 @@ function demoEpisodeStreamUrl(episodeId: number, seconds: number, hz: number): s
 	const url = URL.createObjectURL(makeWav(seconds, hz));
 	episodeStreamCache.set(episodeId, url);
 	return url;
+}
+
+/** Une piste de démo lue depuis un fichier distant réel (voir l'album « Musique libre ») :
+ * incompatible avec le graphe Web Audio (égaliseur/normalisation), qui exige crossOrigin
+ * sur l'élément audio — échoue silencieusement sans en-têtes CORS, que ce fichier n'envoie
+ * pas. À utiliser pour exclure ces pistes de l'éligibilité EQ (voir eqEligible, +layout.svelte),
+ * exactement comme les radios/podcasts le sont déjà pour la même raison. Sûr à appeler avec
+ * n'importe quel id (y compris un vrai item Jellyfin) : ne matche que les pistes de ce module.
+ */
+export function isDemoExternalTrack(itemId: string): boolean {
+	return Boolean(findTrackSpec(itemId).url);
 }
 
 function findTrackSpec(itemId: string): DemoTrackSpec {
