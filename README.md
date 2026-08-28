@@ -8,6 +8,25 @@ Auto-hébergeable via Docker, ou installable en application Android.
 **▶️ Démonstration en ligne : <https://tentacle.fuzzinvaders.space>** — un petit catalogue d'exemple,
 jouable, pour faire le tour de l'interface sans rien installer ni connecter.
 
+## Captures d'écran
+
+<table>
+<tr>
+<td width="50%"><img src="docs/screenshots/accueil.png" alt="Écran d'accueil : reprendre, favoris, découverte"></td>
+<td width="50%"><img src="docs/screenshots/album.png" alt="Vue album, avec pochette pixel-art générée"></td>
+</tr>
+<tr>
+<td width="50%"><img src="docs/screenshots/radios.png" alt="Radios en direct favorites"></td>
+<td width="50%"><img src="docs/screenshots/podcasts.png" alt="Abonnements podcasts"></td>
+</tr>
+<tr>
+<td colspan="2"><img src="docs/screenshots/lecteur.png" alt="Lecteur plein écran, paroles synchronisées"></td>
+</tr>
+</table>
+
+*Captures prises sur l'instance de démo — <https://tentacle.fuzzinvaders.space> te laisse essayer
+la même chose en direct.*
+
 ## Sources réunies
 
 | Source | Ce qu'elle apporte |
