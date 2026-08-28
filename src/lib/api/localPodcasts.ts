@@ -3,6 +3,7 @@ import { mapLimit } from '$lib/concurrency';
 import { parsePodcastFeed, type ParsedEpisode, type ParsedFeed } from '$lib/rss';
 import { parseChaptersJson, type Chapter } from '$lib/chapters';
 import { localPodcasts, type LocalFeedMeta } from '$lib/stores/localPodcasts.svelte';
+import { isDemoPodcastFeed, demoPodcastEpisodes } from '$lib/demo';
 import type { PinePodsEpisode, PinePodsPodcast, PinePodsSearchResult } from '$lib/types';
 
 /**
@@ -123,7 +124,12 @@ export async function subscribeToFeed(feedUrl: string): Promise<PinePodsPodcast>
 }
 
 export function listSubscriptions(): PinePodsPodcast[] {
-	return localPodcasts.list().map((f) => toPinePodsPodcast(f.podcastId, f));
+	// Nombre d'épisodes : 0 par défaut pour un flux réel (connu seulement après un premier
+	// listEpisodes), mais déjà connu à l'avance pour un flux de démonstration — sans ce cas
+	// particulier, les cartes affichent « 0 épisodes » alors qu'il y en a bel et bien.
+	return localPodcasts.list().map((f) =>
+		toPinePodsPodcast(f.podcastId, f, isDemoPodcastFeed(f.feedUrl) ? demoPodcastEpisodes(f.feedUrl).length : 0)
+	);
 }
 
 export function unsubscribe(podcastId: number): void {
@@ -139,6 +145,17 @@ export async function listEpisodes(
 ): Promise<PinePodsEpisode[]> {
 	const meta = localPodcasts.get(podcastId);
 	if (!meta) return [];
+	// Flux de démonstration : épisodes générés localement, jamais de téléchargement/analyse réel
+	// (voir demo.ts). Les métadonnées du podcast n'y changent jamais, donc pas de rafraîchissement
+	// à faire non plus.
+	if (isDemoPodcastFeed(meta.feedUrl)) {
+		const episodes = demoPodcastEpisodes(meta.feedUrl).map((ep) => toPinePodsEpisode(ep, podcastId, meta.title));
+		return [...episodes].sort((a, b) => {
+			const da = Date.parse(a.episodepubdate) || 0;
+			const db = Date.parse(b.episodepubdate) || 0;
+			return sortOrder === 'desc' ? db - da : da - db;
+		});
+	}
 	const parsed = await getParsedFeed(podcastId, meta.feedUrl);
 	// Rafraîchit les métadonnées affichées (titre/pochette peuvent changer côté éditeur), mais
 	// SEULEMENT si l'analyse a produit quelque chose de crédible.

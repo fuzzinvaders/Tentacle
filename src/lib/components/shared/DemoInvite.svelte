@@ -1,7 +1,10 @@
 <script lang="ts">
 	// SPDX-License-Identifier: AGPL-3.0-or-later
 	import { jellyfin } from '$lib/stores/jellyfin.svelte';
-	import { DEMO_BASE_URL, DEMO_USER_ID, isDemo } from '$lib/demo';
+	import { localPodcasts } from '$lib/stores/localPodcasts.svelte';
+	import { radios } from '$lib/stores/radios.svelte';
+	import { settings } from '$lib/stores/settings.svelte';
+	import { DEMO_BASE_URL, DEMO_USER_ID, demoPodcastFeeds, demoRadios, isDemo } from '$lib/demo';
 	import { toasts } from '$lib/stores/toasts.svelte';
 
 	/**
@@ -24,6 +27,12 @@
 			userId: DEMO_USER_ID,
 			serverName: 'Démonstration'
 		});
+		// Podcasts et radios n'ont pas de notion de connexion à part (voir demo.ts) : on peuple
+		// directement leurs stores, comme le ferait un visiteur qui viendrait de s'abonner/ajouter
+		// ces éléments lui-même.
+		settings.set('podcastSource', 'local');
+		for (const { podcastId, meta } of demoPodcastFeeds()) localPodcasts.upsert(podcastId, meta);
+		for (const station of demoRadios()) radios.add(station);
 		toasts.info('Mode démonstration activé.');
 	}
 </script>

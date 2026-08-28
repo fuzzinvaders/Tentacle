@@ -1,4 +1,6 @@
-import type { JellyfinItem } from '$lib/types';
+import type { JellyfinItem, RadioStation } from '$lib/types';
+import type { ParsedEpisode } from '$lib/rss';
+import type { LocalFeedMeta } from '$lib/stores/localPodcasts.svelte';
 
 /**
  * Mode démonstration : un faux catalogue jouable, sans aucun serveur.
@@ -224,6 +226,148 @@ export function demoSearch(term: string, kind: 'audio' | 'album' | 'artist'): Je
 	return demoTracks().filter((t) => match(t.Name) || match(t.AlbumArtist) || match(t.Album));
 }
 
+// ---- Podcasts (abonnements « locaux », voir stores/localPodcasts.svelte.ts) ----
+
+/** Préfixe reconnu comme flux de démonstration par `listEpisodes()` (api/localPodcasts.ts) :
+ * court-circuite le téléchargement/analyse réel du flux, jamais atteint pour ces ids. */
+export const DEMO_PODCAST_FEED_PREFIX = 'demo://podcast/';
+
+type DemoEpisodeSpec = { title: string; description: string; seconds: number; hz: number; daysAgo: number };
+type DemoPodcastSpec = {
+	id: number;
+	title: string;
+	author: string;
+	description: string;
+	hue: number;
+	episodes: DemoEpisodeSpec[];
+};
+
+const PODCASTS: DemoPodcastSpec[] = [
+	{
+		id: 900001,
+		title: 'Journal des abysses',
+		author: 'Institut Céphalopode',
+		description:
+			'Chronique (fictive) des grands fonds : bioluminescence, pression, et vie discrète loin de la surface.',
+		hue: 200,
+		episodes: [
+			{
+				title: 'Zone crépusculaire',
+				description: 'Ce qui reste de lumière entre 200 et 1000 mètres, et qui y vit malgré tout.',
+				seconds: 58,
+				hz: 164,
+				daysAgo: 0
+			},
+			{
+				title: 'Pression et silence',
+				description: "Pourquoi le grand large est plus calme qu'on ne l'imagine.",
+				seconds: 64,
+				hz: 146,
+				daysAgo: 6
+			},
+			{
+				title: 'Encre et fuite',
+				description: 'Une vieille stratégie de défense, revisitée.',
+				seconds: 49,
+				hz: 174,
+				daysAgo: 13
+			}
+		]
+	},
+	{
+		id: 900002,
+		title: 'Radio Ceph',
+		author: 'Les Céphalopodes',
+		description: "Les coulisses (fictives) du groupe qui a composé le catalogue de cette démo.",
+		hue: 8,
+		episodes: [
+			{
+				title: "Composer avec huit bras",
+				description: "Retour sur l'enregistrement du dernier album.",
+				seconds: 52,
+				hz: 196,
+				daysAgo: 1
+			},
+			{
+				title: 'Le studio du port',
+				description: "Où et comment le groupe enregistre, entre deux marées.",
+				seconds: 61,
+				hz: 220,
+				daysAgo: 9
+			}
+		]
+	}
+];
+
+export function isDemoPodcastFeed(feedUrl: string): boolean {
+	return feedUrl.startsWith(DEMO_PODCAST_FEED_PREFIX);
+}
+
+/** Abonnements prêts à être injectés dans le store localPodcasts (voir DemoInvite.svelte). */
+export function demoPodcastFeeds(): Array<{ podcastId: number; meta: LocalFeedMeta }> {
+	return PODCASTS.map((p) => ({
+		podcastId: p.id,
+		meta: {
+			feedUrl: `${DEMO_PODCAST_FEED_PREFIX}${p.id}`,
+			title: p.title,
+			artworkUrl: demoArtwork(p.hue, p.title),
+			author: p.author,
+			description: p.description
+		}
+	}));
+}
+
+/** Épisodes d'un flux de démonstration, au même format que parsePodcastFeed (rss.ts) — pour
+ * que listEpisodes() les traite ensuite exactement comme un flux réel une fois récupérés. */
+export function demoPodcastEpisodes(feedUrl: string): ParsedEpisode[] {
+	const podcast = PODCASTS.find((p) => feedUrl === `${DEMO_PODCAST_FEED_PREFIX}${p.id}`);
+	if (!podcast) return [];
+	const artworkUrl = demoArtwork(podcast.hue, podcast.title);
+	return podcast.episodes.map((ep, i) => ({
+		id: podcast.id * 1000 + i,
+		title: ep.title,
+		description: ep.description,
+		pubDate: new Date(Date.now() - ep.daysAgo * 86_400_000).toISOString(),
+		durationSec: ep.seconds,
+		enclosureUrl: demoEpisodeStreamUrl(podcast.id * 1000 + i, ep.seconds, ep.hz),
+		artworkUrl
+	}));
+}
+
+// ---- Radios (voir stores/radios.svelte.ts — pas de notion de connexion, juste une liste) ----
+
+/** Trois flux publics réels, librement diffusables (SomaFM — service communautaire à but non
+ * lucratif qui encourage explicitement le lien direct vers ses flux). Contrairement au reste de
+ * la démo, une radio est par nature un flux en direct : pas d'équivalent « sans réseau » possible. */
+export function demoRadios(): RadioStation[] {
+	return [
+		{
+			id: 'demo-radio-groovesalad',
+			name: 'Groove Salad (SomaFM)',
+			streamUrl: 'https://ice1.somafm.com/groovesalad-128-mp3',
+			faviconUrl: demoArtwork(150, 'Groove Salad'),
+			tags: 'ambient, downtempo',
+			homepage: 'https://somafm.com/groovesalad/'
+		},
+		{
+			id: 'demo-radio-secretagent',
+			name: 'Secret Agent (SomaFM)',
+			streamUrl: 'https://ice1.somafm.com/secretagent-128-mp3',
+			faviconUrl: demoArtwork(20, 'Secret Agent'),
+			tags: 'lounge, spy jazz',
+			homepage: 'https://somafm.com/secretagent/'
+		},
+		{
+			id: 'demo-radio-dronezone',
+			name: 'Drone Zone (SomaFM)',
+			streamUrl: 'https://ice1.somafm.com/dronezone-128-mp3',
+			faviconUrl: demoArtwork(260, 'Drone Zone'),
+			tags: 'ambient, space music',
+			homepage: 'https://somafm.com/dronezone/'
+		}
+	];
+}
+
 // ---- Audio synthétisé ----
 
 const streamCache = new Map<string, string>();
@@ -242,6 +386,17 @@ export function demoStreamUrl(itemId: string): string {
 	const spec = findTrackSpec(itemId);
 	const url = URL.createObjectURL(makeWav(spec.seconds, spec.hz));
 	streamCache.set(itemId, url);
+	return url;
+}
+
+const episodeStreamCache = new Map<number, string>();
+
+/** Même principe que demoStreamUrl, pour un épisode de podcast de démonstration. */
+function demoEpisodeStreamUrl(episodeId: number, seconds: number, hz: number): string {
+	const cached = episodeStreamCache.get(episodeId);
+	if (cached) return cached;
+	const url = URL.createObjectURL(makeWav(seconds, hz));
+	episodeStreamCache.set(episodeId, url);
 	return url;
 }
 
