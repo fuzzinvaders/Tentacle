@@ -388,7 +388,10 @@ radios ne sont jamais scrobblées.
 - **Sauvegarde des réglages** — Configuration → *Sauvegarde des réglages* : exporte un fichier
   `tentacle-reglages.json` contenant préférences, radios, vitesses et sauts par podcast, et
   abonnements aux podcasts intégrés. **Aucun mot de passe ni jeton de source** n'y figure. C'est le
-  moyen de transférer ces données d'un appareil à l'autre.
+  moyen de transférer ces données d'un appareil à l'autre. *Sur le web*, c'est un téléchargement de
+  navigateur classique. *Sur l'application Android*, le fichier est écrit directement dans le
+  dossier **Documents** partagé de l'appareil (visible depuis n'importe quel gestionnaire de
+  fichiers) — le téléchargement de navigateur n'a pas d'équivalent fiable dans la WebView.
 - **Mon compte** *(Web)* — changer son mot de passe.
 - **Utilisateurs** *(Web, administrateur)* — créer des comptes, réinitialiser un mot de passe,
   supprimer un compte. Chaque compte a **sa propre configuration**.
