@@ -749,6 +749,17 @@ function simplifyTrackTitle(title: string): string {
 		.trim();
 }
 
+/** Retire toute apostrophe/guillemet simple — droit ' ou courbe ’ (et variantes). Un titre
+ * COURT où l'apostrophe est la seule différence (constaté : « Beggin' ») peut suffire à faire
+ * échouer SearchTerm si le caractère exact ne correspond pas entre la source externe et le tag
+ * local — la recherche Jellyfin ne semble pas les traiter comme équivalents. */
+function stripApostrophes(title: string): string {
+	return title
+		.replace(/['’‘‚‛´`]/g, '')
+		.replace(/\s{2,}/g, ' ')
+		.trim();
+}
+
 /**
  * Best-effort match of an external track (e.g. a ListenBrainz playlist entry) to a playable
  * Audio item in the user's Jellyfin library. Searches by title, then prefers a result whose
@@ -762,6 +773,7 @@ export async function findAudioMatch(
 	const title = opts.title.trim();
 	if (!title) return null;
 	let items = await searchAudioByTitle(conn, title);
+	let lastTried = title;
 	// Le titre externe (Deezer/LB) porte souvent un qualificatif absent du tag local (ou
 	// l'inverse) : « Titre (Remastered 2011) » ne matche pas « Titre » via SearchTerm. Un
 	// second essai simplifié rattrape ces cas plutôt que d'abandonner le titre silencieusement.
@@ -769,6 +781,15 @@ export async function findAudioMatch(
 		const simplified = simplifyTrackTitle(title);
 		if (simplified && simplified.toLowerCase() !== title.toLowerCase()) {
 			items = await searchAudioByTitle(conn, simplified);
+			lastTried = simplified;
+		}
+	}
+	// Troisième essai, apostrophe retirée — cas constaté séparément du précédent (« Beggin' »
+	// n'a ni parenthèse ni qualificatif à retirer, donc le second essai ne change rien).
+	if (items.length === 0) {
+		const stripped = stripApostrophes(lastTried);
+		if (stripped && stripped.toLowerCase() !== lastTried.toLowerCase()) {
+			items = await searchAudioByTitle(conn, stripped);
 		}
 	}
 	if (items.length === 0) return null;
