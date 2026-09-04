@@ -725,6 +725,30 @@ export async function getFrequentlyPlayedSongs(
 	return data.Items ?? [];
 }
 
+async function searchAudioByTitle(conn: JellyfinConnection, title: string): Promise<JellyfinItem[]> {
+	const data = await jfGet<{ Items?: JellyfinItem[] }>(
+		conn,
+		itemsPath(conn.userId, {
+			IncludeItemTypes: 'Audio',
+			Recursive: 'true',
+			SearchTerm: title,
+			Fields: ITEM_FIELDS,
+			Limit: 10
+		})
+	);
+	return data.Items ?? [];
+}
+
+/** Retire les qualificatifs de titre qui font souvent diverger la source externe (Deezer,
+ * ListenBrainz) du tag Jellyfin local : « (Remastered 2011) », « (feat. X) », « - Radio Edit »… */
+function simplifyTrackTitle(title: string): string {
+	return title
+		.replace(/[([][^)\]]*[)\]]/g, '')
+		.replace(/\s*[-–—]\s*(feat\.?|ft\.?|with|remaster(ed)?|live|radio edit|single version).*$/i, '')
+		.replace(/\s{2,}/g, ' ')
+		.trim();
+}
+
 /**
  * Best-effort match of an external track (e.g. a ListenBrainz playlist entry) to a playable
  * Audio item in the user's Jellyfin library. Searches by title, then prefers a result whose
@@ -737,17 +761,16 @@ export async function findAudioMatch(
 	if (isDemo(conn)) return demoSearch(opts.title, 'audio')[0] ?? null;
 	const title = opts.title.trim();
 	if (!title) return null;
-	const data = await jfGet<{ Items?: JellyfinItem[] }>(
-		conn,
-		itemsPath(conn.userId, {
-			IncludeItemTypes: 'Audio',
-			Recursive: 'true',
-			SearchTerm: title,
-			Fields: ITEM_FIELDS,
-			Limit: 10
-		})
-	);
-	const items = data.Items ?? [];
+	let items = await searchAudioByTitle(conn, title);
+	// Le titre externe (Deezer/LB) porte souvent un qualificatif absent du tag local (ou
+	// l'inverse) : « Titre (Remastered 2011) » ne matche pas « Titre » via SearchTerm. Un
+	// second essai simplifié rattrape ces cas plutôt que d'abandonner le titre silencieusement.
+	if (items.length === 0) {
+		const simplified = simplifyTrackTitle(title);
+		if (simplified && simplified.toLowerCase() !== title.toLowerCase()) {
+			items = await searchAudioByTitle(conn, simplified);
+		}
+	}
 	if (items.length === 0) return null;
 
 	const artist = opts.artist?.trim().toLowerCase();

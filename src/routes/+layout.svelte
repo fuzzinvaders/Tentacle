@@ -326,6 +326,10 @@
 				// requestAnimationFrame va être gelé : on termine tout fondu en cours, sinon le
 				// volume resterait figé en chemin (et la lecture continuerait en silence).
 				settleFade();
+				// Même chose pour le fondu enchaîné — sans ça, un fondu surpris par la mise en
+				// arrière-plan reste bloqué à mi-chemin ET bloque `crossfading` à vrai pour de
+				// bon, ce qui coupe l'enchaînement de tous les titres suivants.
+				settleCrossfade();
 				flush();
 			} else {
 				// De retour au premier plan : dernier filet, au cas où le son serait resté à zéro.
@@ -443,6 +447,13 @@
 	let crossfading = false;
 	let xfRaf: number | undefined;
 	let xfAttemptId = ''; // id du titre pour lequel un fondu a déjà été tenté (anti-réessais)
+	// Éléments/cible du fondu en cours, mémorisés pour pouvoir le terminer d'un coup si l'onglet
+	// passe en arrière-plan pendant la rampe (voir settleCrossfade) — même besoin que fadeEl/
+	// fadeTarget/fadeDone pour l'autre fondu, et même raison : requestAnimationFrame gèle alors.
+	let xfFromEl: HTMLAudioElement | undefined;
+	let xfOtherEl: HTMLAudioElement | undefined;
+	let xfTarget = 0;
+	let xfWatchdog: ReturnType<typeof setTimeout> | undefined;
 
 	function crossfadeEligible(): boolean {
 		return (
@@ -489,6 +500,19 @@
 		otherEl
 			.play()
 			.then(() => {
+				// Onglet déjà en arrière-plan à cet instant précis : requestAnimationFrame ne
+				// tournera pas (voir canFade). Bascule immédiate plutôt qu'une rampe qui ne
+				// progresserait jamais — sinon le nouveau titre resterait bloqué à volume 0
+				// (otherEl.volume = 0 ci-dessus) et `crossfading` resterait vrai pour de bon,
+				// coupant l'enchaînement de TOUS les titres suivants (onEnded l'ignore tant que
+				// `crossfading` est vrai).
+				if (!canFade()) {
+					finishCrossfade(fromEl, otherEl, target);
+					return;
+				}
+				xfFromEl = fromEl;
+				xfOtherEl = otherEl;
+				xfTarget = target;
 				const start = performance.now();
 				const durMs = xf * 1000;
 				const step = (now: number) => {
@@ -502,6 +526,16 @@
 					}
 				};
 				xfRaf = requestAnimationFrame(step);
+				// Filet de sécurité, indépendant de la cause : `canFade()` ne détecte que l'onglet
+				// masqué (document.hidden), mais Chrome peut aussi geler requestAnimationFrame
+				// pour une fenêtre occultée/sans focus SANS faire passer document.hidden à vrai
+				// (constaté : la rampe reste figée alors que document.hidden vaut toujours false).
+				// Sans ce filet, le nouveau titre resterait bloqué à volume 0 pour de bon, et
+				// `crossfading` aussi — coupant l'enchaînement de tous les titres suivants.
+				clearTimeout(xfWatchdog);
+				xfWatchdog = setTimeout(() => {
+					if (xfRaf !== undefined) settleCrossfade();
+				}, durMs + 500);
 			})
 			.catch(() => {
 				otherEl.pause();
@@ -512,6 +546,11 @@
 	}
 
 	function finishCrossfade(fromEl: HTMLAudioElement, otherEl: HTMLAudioElement, target: number) {
+		xfRaf = undefined;
+		xfFromEl = undefined;
+		xfOtherEl = undefined;
+		clearTimeout(xfWatchdog);
+		xfWatchdog = undefined;
 		fromEl.pause();
 		fromEl.removeAttribute('src');
 		fromEl.load();
@@ -523,6 +562,15 @@
 		setTimeout(() => {
 			crossfading = false;
 		}, 200);
+	}
+
+	/** Termine immédiatement un fondu enchaîné en cours (voir settleFade — même besoin, pour le
+	 * même motif : requestAnimationFrame gèle en arrière-plan). Sans ce filet, le nouveau titre
+	 * resterait bloqué à volume 0 et `crossfading` resterait vrai pour de bon. */
+	function settleCrossfade() {
+		if (xfRaf === undefined) return;
+		cancelAnimationFrame(xfRaf);
+		if (xfFromEl && xfOtherEl) finishCrossfade(xfFromEl, xfOtherEl, xfTarget);
 	}
 
 	// Metadata (and therefore a seekable duration) isn't available the instant `src` is set —
