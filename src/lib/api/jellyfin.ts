@@ -38,6 +38,15 @@ function getDeviceId(): string {
 	return id;
 }
 
+/**
+ * Valeur de l'en-tête STANDARD `Authorization` (schéma `MediaBrowser`).
+ *
+ * Jellyfin 12 a désactivé par défaut l'authentification « legacy » (option serveur
+ * `EnableLegacyAuthorization`) : `X-Emby-Authorization`, `X-Emby-Token`, `X-MediaBrowser-Token`
+ * et le paramètre `?api_key=` ne sont plus lus. Constaté chez un utilisateur passé en 12 :
+ * connexion refusée en 400, et tous les appels suivants en 401. Le format ci-dessous est celui
+ * que Jellyfin 10.x accepte déjà aussi — la migration est donc sans régression en amont.
+ */
 function authHeader(token?: string): string {
 	const base = `MediaBrowser Client="Tentacle", Device="Tentacle Web", DeviceId="${getDeviceId()}", Version="1.0.0"`;
 	return token ? `${base}, Token="${token}"` : base;
@@ -60,7 +69,7 @@ export async function authenticateByName(
 		method: 'POST',
 		headers: {
 			'Content-Type': 'application/json',
-			'X-Emby-Authorization': authHeader()
+			Authorization: authHeader()
 		},
 		body: JSON.stringify({ Username: username, Pw: password })
 	});
@@ -81,7 +90,7 @@ export async function authenticateByName(
 export async function testConnection(baseUrl: string, token: string, userId: string): Promise<string> {
 	const base = normalizeBaseUrl(baseUrl);
 	const res = await fetchWithTimeout(`${base}/Users/${userId}`, {
-		headers: { 'X-Emby-Token': token }
+		headers: { Authorization: authHeader(token) }
 	});
 	if (!res.ok) {
 		// 401/403 = le SERVEUR répond mais n'accepte pas ce jeton : pas un problème d'URL ni de
@@ -114,7 +123,7 @@ export async function pingServer(baseUrl: string): Promise<string> {
 async function jfGet<T>(conn: JellyfinConnection, path: string): Promise<T> {
 	const base = normalizeBaseUrl(conn.baseUrl);
 	const res = await fetchWithTimeout(`${base}${path}`, {
-		headers: { 'X-Emby-Token': conn.token }
+		headers: { Authorization: authHeader(conn.token) }
 	});
 	if (!res.ok) {
 		throw new ApiError(`Jellyfin a répondu ${res.status} sur ${path}.`, res.status);
@@ -319,7 +328,7 @@ async function jfSend(conn: JellyfinConnection, method: 'POST' | 'DELETE', path:
 	const base = normalizeBaseUrl(conn.baseUrl);
 	const res = await fetchWithTimeout(`${base}${path}`, {
 		method,
-		headers: { 'X-Emby-Token': conn.token }
+		headers: { Authorization: authHeader(conn.token) }
 	});
 	if (!res.ok) {
 		throw new ApiError(`Jellyfin a répondu ${res.status} sur ${path}.`, res.status);
@@ -845,7 +854,9 @@ export function songStreamUrl(
 	const q = buildQuery({
 		UserId: conn.userId,
 		DeviceId: getDeviceId(),
-		api_key: conn.token,
+		// `ApiKey`, pas `api_key` : ce dernier est l'orthographe legacy, ignorée par Jellyfin 12
+		// (flux audio en 401). `ApiKey` est lu par Jellyfin de la 10.8 à la 12.
+		ApiKey: conn.token,
 		Container: 'mp3,aac,m4a',
 		TranscodingContainer: 'mp3',
 		TranscodingProtocol: 'http',

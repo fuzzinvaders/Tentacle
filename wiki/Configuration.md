@@ -36,6 +36,19 @@ Deux méthodes de connexion, dans l'ordre de priorité :
 2. **Identifiant + mot de passe**
    - Authentification classique par nom d'utilisateur / mot de passe Jellyfin.
 
+Si le jeton est **refusé** (401/403) alors que identifiant et mot de passe sont aussi renseignés,
+Tentacle retombe sur la connexion par identifiant. Un champ « Token » rempli par erreur (l'autofill
+d'un gestionnaire de mots de passe peut y glisser le mot de passe) ne bloque donc plus.
+
+### Compatibilité Jellyfin 10 → 12
+
+Tentacle s'authentifie avec l'en-tête **standard** `Authorization: MediaBrowser …` et le paramètre
+`?ApiKey=` pour les flux audio. **Jellyfin 12** a en effet désactivé par défaut l'authentification
+« legacy » (`X-Emby-Authorization`, `X-Emby-Token`, `?api_key=` ; option serveur
+`EnableLegacyAuthorization`) : une application qui s'en sert y obtient **400 à la connexion puis 401
+partout**. Le format actuel est aussi accepté par Jellyfin 10.x, donc rien à changer côté serveur —
+inutile de réactiver l'option legacy, que Jellyfin prévoit de retirer.
+
 ## Fichiers locaux
 
 Aucune connexion : **Choisir des fichiers** ou **Choisir un dossier** depuis l'appareil. Formats
