@@ -190,13 +190,20 @@ affiche seulement un message expliquant que la fonction est réservée à l'appl
 - les **préférences** ;
 - les **radios** enregistrées ;
 - les **vitesses** et **sauts intro/outro** mémorisés par podcast ;
-- les **abonnements aux podcasts « Intégrés »**, avec progression et file.
+- les **abonnements aux podcasts « Intégrés »**, avec progression et file ;
+- **optionnellement**, les **connexions aux sources** : URL des serveurs (Jellyfin, PinePods,
+  Lidarr), jetons et clés API (Jellyfin, PinePods, ListenBrainz, Last.fm, Lidarr).
 
-**Aucun mot de passe ni jeton de source n'y figure** — c'est volontaire, le fichier peut donc être
-transféré sans risque. C'est le moyen de déplacer les données « locales à l'appareil » d'un
-téléphone ou navigateur à l'autre.
+La case **« Inclure les identifiants des sources »** (cochée par défaut) contrôle ce dernier point.
+C'est ce qui permet de monter l'application Android à partir de la version web sans tout
+ressaisir. ⚠️ **Le fichier contient alors tes jetons en clair** : ne le partage pas, et supprime-le
+une fois importé. Décochée, aucun jeton ni URL de serveur ne figure dans le fichier, qui peut être
+transféré sans risque. La connexion de démonstration n'est jamais exportée.
 
-**⬆ Restaurer** remplace tout ce qui précède. Un fichier qui n'est pas une sauvegarde Tentacle est
+**⬆ Restaurer** remplace les préférences, radios et podcasts. Les **connexions**, elles, sont
+*ajoutées* : une source absente du fichier n'est pas déconnectée, et une connexion mal formée est
+ignorée plutôt qu'appliquée. Sur **Android**, Last.fm et Lidarr ne sont pas repris (ils passent par
+le serveur Tentacle, absent de l'application). Un fichier qui n'est pas une sauvegarde Tentacle est
 refusé.
 
 ### Comptes — **web uniquement**

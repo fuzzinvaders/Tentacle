@@ -387,7 +387,9 @@ radios ne sont jamais scrobblées.
   **Nocturne** (néons façon Dracula, formes adoucies).
 - **Sauvegarde des réglages** — Configuration → *Sauvegarde des réglages* : exporte un fichier
   `tentacle-reglages.json` contenant préférences, radios, vitesses et sauts par podcast, et
-  abonnements aux podcasts intégrés. **Aucun mot de passe ni jeton de source** n'y figure. C'est le
+  abonnements aux podcasts intégrés. Une case permet d'**inclure les identifiants des sources**
+  (URL des serveurs, jetons, clés API — en clair dans le fichier, à ne pas partager) : c'est ce qui
+  permet de monter l'application Android à partir de la version web sans tout ressaisir. C'est le
   moyen de transférer ces données d'un appareil à l'autre. *Sur le web*, c'est un téléchargement de
   navigateur classique. *Sur l'application Android*, le fichier est écrit directement dans le
   dossier **Documents** partagé de l'appareil (visible depuis n'importe quel gestionnaire de

@@ -6,13 +6,16 @@
 	import { localPodcasts, type LocalFeedMeta, type LocalEpisodeState } from '$lib/stores/localPodcasts.svelte';
 	import { toasts } from '$lib/stores/toasts.svelte';
 	import type { RadioStation } from '$lib/types';
+	import { buildConnections, applyConnections, type Connections } from '$lib/profileSync.svelte';
 	import { Capacitor } from '@capacitor/core';
 	import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 
 	const FILE_NAME = 'tentacle-reglages.json';
 
-	// La sauvegarde ne contient QUE des préférences non sensibles : aucun jeton / clé API des
-	// sources (ceux-ci restent dans le profil serveur chiffré côté compte).
+	// Préférences, radios, podcasts… et, SI l'utilisateur le demande, les connexions aux sources
+	// (URL des serveurs + jetons / clés API) : c'est ce qui permet de monter une application
+	// Android à partir de la version web sans tout ressaisir. Ces dernières sont sensibles —
+	// d'où une case explicite, et l'absence du champ `connections` quand elle est décochée.
 	type Backup = {
 		app: 'tentacle';
 		kind: 'settings-backup';
@@ -23,9 +26,11 @@
 		localPodcastFeeds: Record<number, LocalFeedMeta>;
 		localPodcastState: Record<number, LocalEpisodeState>;
 		localPodcastQueue: number[];
+		connections?: Connections;
 	};
 
 	let fileInput = $state<HTMLInputElement>();
+	let includeCredentials = $state(true);
 
 	async function exportBackup() {
 		const data: Backup = {
@@ -37,7 +42,8 @@
 			podcastSkips: podcastSkips.all(),
 			localPodcastFeeds: localPodcasts.allFeeds(),
 			localPodcastState: localPodcasts.allState(),
-			localPodcastQueue: localPodcasts.allQueue()
+			localPodcastQueue: localPodcasts.allQueue(),
+			...(includeCredentials ? { connections: buildConnections() } : {})
 		};
 		const json = JSON.stringify(data, null, 2);
 
@@ -97,7 +103,14 @@
 					data.localPodcastState ?? {},
 					Array.isArray(data.localPodcastQueue) ? data.localPodcastQueue : []
 				);
-			toasts.info('Réglages restaurés.');
+			const connected = applyConnections(data.connections, {
+				native: Capacitor.isNativePlatform()
+			});
+			toasts.info(
+				connected.length > 0
+					? `Réglages restaurés — sources reconnectées : ${connected.join(', ')}.`
+					: 'Réglages restaurés.'
+			);
 		} catch {
 			toasts.error('Impossible de lire ce fichier de sauvegarde.');
 		}
@@ -106,9 +119,20 @@
 
 <div class="backup">
 	<p class="backup__hint">
-		Exporte tes préférences, radios favorites et vitesses de podcasts dans un fichier
-		(sans mots de passe ni jetons des sources). Utile pour migrer d'un appareil à l'autre.
+		Exporte tes préférences, radios favorites, abonnements et vitesses de podcasts dans un
+		fichier. Utile pour migrer d'un appareil à l'autre — par exemple de la version web vers
+		l'application Android.
 	</p>
+	<label class="backup__check">
+		<input type="checkbox" bind:checked={includeCredentials} />
+		<span>Inclure les identifiants des sources (URL des serveurs, jetons, clés API)</span>
+	</label>
+	{#if includeCredentials}
+		<p class="backup__warn">
+			⚠️ Le fichier contiendra tes jetons en clair : garde-le pour toi et supprime-le une fois
+			importé. Sur Android, Last.fm et Lidarr (réservés à la version web) ne sont pas repris.
+		</p>
+	{/if}
 	<div class="backup__actions">
 		<button type="button" class="pixel-btn pixel-btn--ghost" onclick={exportBackup}>
 			⬇ Exporter les réglages
@@ -131,6 +155,21 @@
 		margin: 0 0 0.75rem;
 		color: var(--muted);
 		font-size: 0.82rem;
+	}
+
+	.backup__check {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.5rem;
+		margin: 0 0 0.5rem;
+		font-size: 0.85rem;
+		cursor: pointer;
+	}
+
+	.backup__warn {
+		margin: 0 0 0.75rem;
+		color: var(--coral);
+		font-size: 0.78rem;
 	}
 
 	.backup__actions {

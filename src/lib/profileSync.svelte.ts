@@ -5,6 +5,7 @@ import { lastfm, type LastfmConnection } from '$lib/stores/lastfm.svelte';
 import { lidarr, type LidarrConnection } from '$lib/stores/lidarr.svelte';
 import { settings, type Settings } from '$lib/stores/settings.svelte';
 import { radios } from '$lib/stores/radios.svelte';
+import { isDemo } from '$lib/demo';
 import type { PinePodsConnection, RadioStation } from '$lib/types';
 
 /**
@@ -58,6 +59,101 @@ export function buildProfile(): Profile {
 		settings: settings.values,
 		radios: radios.stations
 	};
+}
+
+export type Connections = Pick<
+	Profile,
+	'jellyfin' | 'pinepods' | 'listenbrainz' | 'lastfm' | 'lidarr'
+>;
+
+/**
+ * Connexions aux sources (URL des serveurs, jetons, clés API) pour l'export d'une sauvegarde.
+ * La connexion de démonstration n'en fait pas partie : c'est un artefact local, pas un serveur.
+ */
+export function buildConnections(): Connections {
+	const jf = jellyfin.connection;
+	return {
+		jellyfin: jf && !isDemo(jf) ? jf : null,
+		pinepods: pinepods.connection,
+		listenbrainz: listenbrainz.connection,
+		lastfm: lastfm.connection,
+		lidarr: lidarr.connection
+	};
+}
+
+const isStr = (v: unknown): v is string => typeof v === 'string';
+const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object';
+
+/**
+ * Applique les connexions d'une sauvegarde importée. Contrairement à `applyProfile`, c'est
+ * ADDITIF : une source absente du fichier n'est pas déconnectée (une sauvegarde faite sans les
+ * identifiants ne doit pas vider ceux déjà saisis sur l'appareil).
+ *
+ * Le fichier vient de l'extérieur : chaque connexion est validée (forme + chaînes non vides)
+ * avant d'être appliquée, plutôt que d'écrire n'importe quoi dans le stockage.
+ *
+ * `native` : Last.fm et Lidarr passent par le serveur Tentacle (signature / relais, voir la
+ * doc) et n'existent donc pas dans l'application Android — les connecter y laisserait une
+ * source « connectée » qui ne peut jamais fonctionner.
+ *
+ * Renvoie les noms des sources effectivement connectées.
+ */
+export function applyConnections(c: unknown, opts: { native: boolean }): string[] {
+	if (!isObj(c)) return [];
+	const done: string[] = [];
+
+	const jf = c.jellyfin;
+	if (isObj(jf) && isStr(jf.baseUrl) && jf.baseUrl && isStr(jf.token) && isStr(jf.userId)) {
+		const conn: JellyfinConnection = {
+			baseUrl: jf.baseUrl,
+			token: jf.token,
+			userId: jf.userId,
+			serverName: isStr(jf.serverName) ? jf.serverName : undefined
+		};
+		if (!isDemo(conn)) {
+			jellyfin.connect(conn);
+			done.push('Jellyfin');
+		}
+	}
+
+	const pp = c.pinepods;
+	if (isObj(pp) && isStr(pp.baseUrl) && pp.baseUrl && isStr(pp.apiKey) && typeof pp.userId === 'number') {
+		pinepods.connect({ baseUrl: pp.baseUrl, apiKey: pp.apiKey, userId: pp.userId });
+		done.push('PinePods');
+	}
+
+	const lb = c.listenbrainz;
+	if (isObj(lb) && isStr(lb.token) && lb.token && isStr(lb.userName)) {
+		listenbrainz.connect({ token: lb.token, userName: lb.userName });
+		done.push('ListenBrainz');
+	}
+
+	if (!opts.native) {
+		const lf = c.lastfm;
+		if (
+			isObj(lf) &&
+			isStr(lf.apiKey) &&
+			isStr(lf.secret) &&
+			isStr(lf.sessionKey) &&
+			isStr(lf.username)
+		) {
+			lastfm.connect({
+				apiKey: lf.apiKey,
+				secret: lf.secret,
+				sessionKey: lf.sessionKey,
+				username: lf.username
+			});
+			done.push('Last.fm');
+		}
+
+		const ld = c.lidarr;
+		if (isObj(ld) && isStr(ld.baseUrl) && ld.baseUrl && isStr(ld.apiKey)) {
+			lidarr.connect({ baseUrl: ld.baseUrl, apiKey: ld.apiKey });
+			done.push('Lidarr');
+		}
+	}
+
+	return done;
 }
 
 /** Hydrate les stores depuis un profil serveur (écrase l'état local courant). */

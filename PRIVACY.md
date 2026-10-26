@@ -33,7 +33,10 @@ l'éditeur.
 | Heure de réveil programmé | Déclencher la notification |
 
 Ces données sont **supprimées avec l'application**. L'export de réglages
-(*Configuration → Sauvegarde*) produit un fichier qui **ne contient aucun mot de passe ni jeton**.
+(*Configuration → Sauvegarde*) est un fichier que **tu** produis et que **tu** déplaces : il n'est
+envoyé à personne par l'application. Quand la case **« Inclure les identifiants des sources »** est
+cochée (c'est le cas par défaut), il contient les adresses de tes serveurs et tes jetons d'API
+**en clair** — à traiter comme un mot de passe. Décochée, il n'en contient aucun.
 
 ## Données envoyées à des tiers — et lesquels
 
