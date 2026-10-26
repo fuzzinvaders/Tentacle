@@ -84,7 +84,14 @@ export async function testConnection(baseUrl: string, token: string, userId: str
 		headers: { 'X-Emby-Token': token }
 	});
 	if (!res.ok) {
-		throw new ApiError(`Jellyfin a refusé la connexion (HTTP ${res.status}).`, res.status);
+		// 401/403 = le SERVEUR répond mais n'accepte pas ce jeton : pas un problème d'URL ni de
+		// réseau (ceux-là n'arrivent jamais jusqu'à un code HTTP). L'ancien message ne disait pas
+		// que c'était le jeton qui était en cause.
+		const detail =
+			res.status === 401 || res.status === 403
+				? ' — le token est invalide, révoqué, ou ce n\'est pas un token (vide le champ pour utiliser identifiant + mot de passe).'
+				: '.';
+		throw new ApiError(`Jellyfin a refusé la connexion (HTTP ${res.status})${detail}`, res.status);
 	}
 	const data = await res.json();
 	return data.Name ?? 'Connecté';

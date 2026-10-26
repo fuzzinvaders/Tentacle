@@ -31,9 +31,19 @@
 					errorMessage = "L'ID utilisateur Jellyfin est requis avec un token.";
 					return;
 				}
-				const serverName = await testConnection(serverUrl.trim(), token.trim(), userId.trim());
-				jellyfin.connect({ baseUrl: serverUrl.trim(), token: token.trim(), userId: userId.trim(), serverName });
-				return;
+				try {
+					const serverName = await testConnection(serverUrl.trim(), token.trim(), userId.trim());
+					jellyfin.connect({ baseUrl: serverUrl.trim(), token: token.trim(), userId: userId.trim(), serverName });
+					return;
+				} catch (err) {
+					// Le jeton est PRIORITAIRE sur l'identifiant/mot de passe : sans ce repli, un
+					// champ « Token » rempli par erreur (l'autofill d'un gestionnaire de mots de
+					// passe peut y glisser le mot de passe, il est de type password) faisait
+					// échouer la connexion alors que l'identifiant + mot de passe, eux aussi
+					// saisis, étaient bons. On ne retombe dessus QUE si le jeton est refusé.
+					const refused = err instanceof JellyfinApiError && (err.status === 401 || err.status === 403);
+					if (!(refused && username.trim() && password)) throw err;
+				}
 			}
 
 			if (username.trim() && password) {
