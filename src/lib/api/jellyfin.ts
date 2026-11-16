@@ -3,7 +3,8 @@ import { browser } from '$app/environment';
 import { fetchWithTimeout, ApiError } from '$lib/http';
 import type { JellyfinConnection } from '$lib/stores/jellyfin.svelte';
 import type { JellyfinItem } from '$lib/types';
-import { rankFocusedMix, dominantGenres } from '$lib/mix';
+import { rankFocusedMix, dominantGenres, artistAffinities } from '$lib/mix';
+import { fetchSimilarArtistNames } from '$lib/api/similar';
 import {
 	isDemo,
 	demoAlbums,
@@ -566,6 +567,77 @@ export async function getInstantMix(
 	return getRawInstantMix(conn, itemId, limit);
 }
 
+function affinityOf(affinity: Map<string, number>, item: JellyfinItem): number {
+	let best = 0;
+	for (const a of [...(item.Artists ?? []), ...(item.AlbumArtist ? [item.AlbumArtist] : [])]) {
+		const v = affinity.get(normalizeName(a));
+		if (v !== undefined && v > best) best = v;
+	}
+	return best;
+}
+
+function normalizeName(s: string): string {
+	return s
+		.normalize('NFD')
+		.replace(/[̀-ͯ]/g, '')
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, ' ')
+		.trim();
+}
+
+/** Noms d'artistes proches de la graine, du plus au moins proche, sans doublon. */
+async function collectSimilarArtistNames(
+	conn: JellyfinConnection,
+	artistId: string | undefined,
+	artistName: string | undefined
+): Promise<string[]> {
+	const [deezerNames, jfSimilar] = await Promise.all([
+		artistName ? fetchSimilarArtistNames(artistName) : Promise.resolve([] as string[]),
+		artistId
+			? getSimilarArtists(conn, artistId, 15)
+					.then((a) => a.map((x) => x.Name))
+					.catch(() => [] as string[])
+			: Promise.resolve([] as string[])
+	]);
+	const own = artistName ? normalizeName(artistName) : '';
+	const seen = new Set<string>();
+	return [...deezerNames, ...jfSimilar].filter((n) => {
+		const k = normalizeName(n);
+		if (!k || k === own || seen.has(k)) return false;
+		seen.add(k);
+		return true;
+	});
+}
+
+/** Titres de la bibliothèque dont l'artiste porte l'un de ces noms (correspondance exacte, sans accents/casse). */
+async function getLibraryTracksByArtistNames(
+	conn: JellyfinConnection,
+	names: string[]
+): Promise<JellyfinItem[]> {
+	if (names.length === 0) return [];
+	const found = await Promise.all(
+		names.map((n) =>
+			searchArtists(conn, n)
+				.then((list) => list.find((a) => normalizeName(a.Name) === normalizeName(n))?.Id)
+				.catch(() => undefined)
+		)
+	);
+	const ids = [...new Set(found.filter((x): x is string => Boolean(x)))];
+	if (ids.length === 0) return [];
+	const data = await jfGet<{ Items?: JellyfinItem[] }>(
+		conn,
+		itemsPath(conn.userId, {
+			IncludeItemTypes: 'Audio',
+			Recursive: 'true',
+			ArtistIds: ids.join(','),
+			SortBy: 'Random',
+			Fields: MIX_FIELDS,
+			Limit: 300
+		})
+	);
+	return data.Items ?? [];
+}
+
 async function getFocusedMix(
 	conn: JellyfinConnection,
 	itemId: string,
@@ -601,6 +673,18 @@ async function getFocusedMix(
 	}
 	if (seedGenres.length === 0) return [];
 
+	// Artistes réputés proches (Deezer d'abord, plus fin ; puis « similaires » de Jellyfin).
+	const seedArtistName =
+		seed.Type === 'MusicArtist' ? seed.Name : (seed.AlbumArtist ?? seed.Artists?.[0]);
+	const similarNames = await collectSimilarArtistNames(
+		conn,
+		seed.Type === 'MusicArtist' ? itemId : undefined,
+		seedArtistName
+	);
+	const affinity = artistAffinities(similarNames);
+	// Titres de ces artistes présents dans la bibliothèque (même mal étiquetés en genres).
+	const similarTracks = await getLibraryTracksByArtistNames(conn, similarNames.slice(0, 15));
+
 	const [byGenre, instant] = await Promise.all([
 		jfGet<{ Items?: JellyfinItem[] }>(
 			conn,
@@ -617,7 +701,7 @@ async function getFocusedMix(
 	]);
 
 	const pool = new Map<string, JellyfinItem>();
-	for (const t of [...seedTracks, ...byGenre, ...instant]) pool.set(t.Id, t);
+	for (const t of [...seedTracks, ...similarTracks, ...byGenre, ...instant]) pool.set(t.Id, t);
 
 	return rankFocusedMix(
 		seedGenres,
@@ -625,6 +709,7 @@ async function getFocusedMix(
 			item,
 			genres: item.Genres ?? [],
 			artist: item.Artists?.[0] ?? item.AlbumArtist,
+			affinity: affinityOf(affinity, item),
 			// Seul un titre unique est toujours gardé ; pour un artiste/album, ses titres
 			// concourent comme les autres (sinon ils noieraient le reste du mix).
 			isSeed: seed.Type === 'Audio' && item.Id === itemId

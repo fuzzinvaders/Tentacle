@@ -67,11 +67,13 @@ En ouvrant un artiste :
   ListenBrainz), rapprochés de ta bibliothèque. Si aucune correspondance n'est trouvée, repli sur
   tes titres les plus écoutés de cet artiste. *(La partie mondiale est **Web** uniquement ; sur
   l'APK le repli local s'applique directement.)*
-- **∞ Mix** — mix sans fin autour de cet artiste, restreint au **même plan sonore** : Tentacle
-  relève les genres de l'artiste, puis ne garde que les titres qui en partagent l'essentiel (un genre
-  rare compte plus qu'un genre fourre-tout comme « Rock »), avec au plus 5 titres par artiste. Si la
-  bibliothèque n'a pas de genres renseignés, il se replie sur l'Instant Mix de Jellyfin. Même logique pour
-  les mix d'album, **Mix surprise** et **Lecture sans fin**.
+- **∞ Mix** — mix sans fin autour de cet artiste, restreint à son **plan sonore**. Plexamp s'appuie
+  sur une analyse audio des fichiers, que Jellyfin ne fait pas : Tentacle s'en approche avec deux
+  signaux. (1) les **artistes proches** (Deezer sur la version Web, « artistes similaires » de Jellyfin),
+  dont il retrouve les titres **dans ta bibliothèque** ; (2) les **genres** de l'artiste, où un genre rare
+  compte plus qu'un genre fourre-tout comme « Rock ». Au plus 5 titres par artiste. Sur l'APK (pas de
+  serveur Deezer), seuls Jellyfin et les genres servent ; sans genres renseignés, repli sur l'Instant Mix
+  de Jellyfin. Même logique pour les mix d'album, **Mix surprise** et **Lecture sans fin**.
 - Puis ses albums, et une section **Artistes similaires**.
 
 ### Albums

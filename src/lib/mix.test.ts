@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { scoreCandidates, rankFocusedMix, dominantGenres, normalizeGenre } from './mix';
+import { scoreCandidates, rankFocusedMix, dominantGenres, normalizeGenre, artistAffinities } from './mix';
 
 const c = (name: string, genres: string[], artist = name) => ({ item: name, genres, artist });
 
@@ -70,5 +70,39 @@ describe('dominantGenres', () => {
 	});
 	it('renvoie [] sans genre', () => {
 		expect(dominantGenres([[], []])).toEqual([]);
+	});
+});
+
+describe('artistAffinities', () => {
+	it('décroît avec le rang, de 1 vers ~0,3, sans doublon ni accents', () => {
+		const m = artistAffinities(['Muse', 'Coldplay', 'muse', 'Måneskin']);
+		expect(m.get('muse')).toBe(1);
+		expect(m.get('coldplay')!).toBeLessThan(1);
+		expect(m.get('maneskin')!).toBeLessThan(m.get('coldplay')!);
+		expect(m.get('maneskin')!).toBeGreaterThan(0.29);
+		expect(m.size).toBe(3);
+	});
+});
+
+describe('rankFocusedMix avec affinité d’artiste', () => {
+	const rand = () => 0;
+	it('retient un artiste proche même sans genre commun, mais pas un artiste éloigné', () => {
+		const cands = [
+			c('proche', ['Autre'], 'P'),
+			{ ...c('proche', ['Autre'], 'P'), affinity: 1 },
+			c('eloigne', ['Metal'], 'E')
+		];
+		const out = rankFocusedMix(['Rock'], cands.slice(1), { limit: 5, minResults: 1, rand });
+		expect(out).toEqual(['proche']);
+		expect(rankFocusedMix(['Rock'], [cands[2]], { limit: 5, minResults: 1, rand })).toEqual([]);
+	});
+
+	it('l’affinité fait passer devant à score de genres égal', () => {
+		const cands = [
+			c('a', ['Rock'], 'A'),
+			{ ...c('b', ['Rock'], 'B'), affinity: 0.8 }
+		];
+		const out = rankFocusedMix(['Rock'], cands, { limit: 5, minResults: 1, rand });
+		expect(out[0]).toBe('b');
 	});
 });

@@ -8,6 +8,11 @@
  * candidat (un genre précis pèse plus qu'un genre fourre-tout) et on pénalise les titres qui
  * portent beaucoup de genres que la graine n'a pas.
  *
+ * Deuxième signal, plus proche de la « radio d'artiste » de Plexamp : l'AFFINITÉ d'artiste. Une
+ * vraie analyse sonore des fichiers (ce que fait Plexamp) n'existe ni dans Jellyfin ni dans une API
+ * gratuite ; on s'en approche avec les artistes réputés proches (Deezer, Jellyfin) : un titre dont
+ * l'artiste est proche de la graine est favorisé même si ses genres sont mal renseignés.
+ *
  * Fonctions pures (aucun accès réseau) pour pouvoir les tester.
  */
 
@@ -19,7 +24,31 @@ export type MixCandidate<T> = {
 	artist?: string;
 	/** Titre de l'artiste graine / de la graine elle-même : toujours retenu en priorité. */
 	isSeed?: boolean;
+	/** Proximité de l'artiste avec la graine, 0..1 (voir `artistAffinities`). */
+	affinity?: number;
 };
+
+/** Part du score due à l'affinité d'artiste (le reste vient des genres). */
+export const AFFINITY_WEIGHT = 0.7;
+
+/**
+ * Affinités par nom d'artiste (normalisé) à partir d'une liste ordonnée du plus au moins proche :
+ * 1 pour le premier, décroissant jusqu'à ~0,3 pour le dernier. Les doublons gardent leur meilleur rang.
+ */
+export function artistAffinities(orderedNames: string[]): Map<string, number> {
+	const unique: string[] = [];
+	const seen = new Set<string>();
+	for (const n of orderedNames) {
+		const k = normalizeGenre(n);
+		if (k && !seen.has(k)) {
+			seen.add(k);
+			unique.push(k);
+		}
+	}
+	const out = new Map<string, number>();
+	unique.forEach((k, i) => out.set(k, 1 - (0.7 * i) / Math.max(1, unique.length)));
+	return out;
+}
 
 export type RankOptions = {
 	limit: number;
@@ -108,7 +137,12 @@ export function rankFocusedMix<T>(
 
 	const scores = scoreCandidates(seedGenres, candidates);
 	const ranked = candidates
-		.map((c, i) => ({ c, score: c.isSeed ? 1 : scores[i], key: (c.isSeed ? 1 : scores[i]) + rand() * jitter }))
+		.map((c, i) => {
+			// `raw` (non plafonné) sert à l'ORDRE : sans lui, un titre au genre parfait ET d'un artiste
+			// proche serait à égalité avec un titre au seul genre parfait. `score` (plafonné) sert au seuil.
+			const raw = c.isSeed ? 2 : scores[i] + AFFINITY_WEIGHT * (c.affinity ?? 0);
+			return { c, score: Math.min(1, raw), key: raw + rand() * jitter };
+		})
 		.filter((r) => r.score > 0)
 		.sort((a, b) => b.key - a.key);
 
