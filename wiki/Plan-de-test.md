@@ -218,7 +218,7 @@ page ont été touchés récemment, donc une vérification s'impose.
 | 3.4.3 | Double-tap à gauche / à droite de la pochette | −10 s / +10 s |
 | 3.4.4 | Glisser vers le bas | Ferme l'écran |
 | 3.4.5 | Glisser gauche / droite | Titre suivant / précédent |
-| 3.4.6 | Mini-lecteur replié / déplié | Bascule correcte, pas de contenu tronqué |
+| 3.4.6 | Barre du lecteur : liseré de progression, ☰ (ouvre la file), ▴ (plein écran) | Le liseré déplace la lecture ; ☰ ouvre directement l'onglet File ; pas de contenu tronqué |
 
 ### 3.5 Système et contexte
 

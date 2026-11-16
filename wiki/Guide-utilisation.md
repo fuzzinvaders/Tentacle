@@ -67,7 +67,11 @@ En ouvrant un artiste :
   ListenBrainz), rapprochés de ta bibliothèque. Si aucune correspondance n'est trouvée, repli sur
   tes titres les plus écoutés de cet artiste. *(La partie mondiale est **Web** uniquement ; sur
   l'APK le repli local s'applique directement.)*
-- **∞ Mix** — mix sans fin autour de cet artiste.
+- **∞ Mix** — mix sans fin autour de cet artiste, restreint au **même plan sonore** : Tentacle
+  relève les genres de l'artiste, puis ne garde que les titres qui en partagent l'essentiel (un genre
+  rare compte plus qu'un genre fourre-tout comme « Rock »), avec au plus 5 titres par artiste. Si la
+  bibliothèque n'a pas de genres renseignés, il se replie sur l'Instant Mix de Jellyfin. Même logique pour
+  les mix d'album, **Mix surprise** et **Lecture sans fin**.
 - Puis ses albums, et une section **Artistes similaires**.
 
 ### Albums
@@ -224,37 +228,40 @@ l'écran plein écran : liste horodatée, chapitre courant surligné, clic pour 
 
 ## Le lecteur
 
-### La barre « walkman »
+### La barre du lecteur
 
-Toujours visible en bas. Au centre, une cassette dont les bobines tournent pendant la lecture :
-**cliquer l'étiquette ouvre l'écran plein écran**.
+Une seule ligne, toujours visible en bas : pochette, titre et artiste, puis les commandes. Il n'y a
+volontairement **que deux formats** : cette barre fine (qui laisse toute la place à la navigation)
+et l'écran plein écran ci-dessous.
 
-- **Barre de progression** en forme de bande magnétique (glisser pour se déplacer), temps écoulé /
-  total — ou `● DIRECT` pour une radio.
-- **Transport** : **⇄** aléatoire · **⏮** · **▶/⏸** · **⏭** · **↻** répétition (désactivée → toute
-  la file → un titre) · **☰** file d'attente, avec un **badge indiquant le nombre de titres**.
-- À droite : **▾** replier, un VU-mètre, le **volume**, une LED d'alimentation.
+- **Liseré de progression** tout en haut de la barre : cliquer ou glisser pour se déplacer (plein
+  pour une radio en direct). Le temps écoulé / total est affiché à droite du titre (écran large).
+- **Transport** : **⏮** précédent (écran large) · **▶/⏸** · **⏭** · **☰** file d'attente, avec un
+  **badge indiquant le nombre de titres** · **▴** ouvre le plein écran.
+- **Volume** : curseur dans la barre sur écran large (sur téléphone : touches de volume, ou
+  l'écran plein écran).
 - Un badge **☾** apparaît quand un **minuteur de sommeil** est armé (avec le temps restant) —
   cliquer dessus l'annule.
-- En bas, la **version** de l'app (`v0.0.1 · commit · date`) — pratique pour vérifier une mise à jour.
+- Aléatoire, répétition, vitesse, paroles… sont dans l'écran plein écran.
+- La **version** de l'app (`v0.0.1 · commit · date`), la licence et le lien de soutien sont en bas
+  de la page (pied du contenu défilant) — pratique pour vérifier une mise à jour.
 
 ### La file d'attente
 
-Le bouton **☰** ouvre la file : **⋮⋮** pour glisser-réordonner (ou les touches **↑/↓** quand la
-poignée a le focus), clic sur un titre pour y sauter, **✕** pour retirer.
+Le bouton **☰** ouvre l'écran plein écran directement sur l'onglet **File** : **⋮⋮** pour
+glisser-réordonner (ou les touches **↑/↓** quand la poignée a le focus), clic sur un titre pour y
+sauter, **✕** pour retirer.
 
 - **Vider** ne coupe **pas** la lecture en cours : seuls les titres à venir sont retirés.
-- **Playlist** *(si Jellyfin est connecté)* enregistre la file comme playlist Jellyfin.
+- **Enregistrer en playlist** *(si Jellyfin est connecté)* enregistre la file comme playlist Jellyfin.
 - Un titre qui se termine naturellement **sort** de la file ; le bouton **⏭** manuel, lui, ne
   retire rien.
 
-### Mini-lecteur et gestes
-
-Replié (par défaut sur téléphone), le lecteur devient une seule ligne. Sur cette ligne :
+### Gestes sur la barre
 
 | Geste | Effet |
 | --- | --- |
-| Appui simple | Ouvre l'écran plein écran |
+| Appui simple sur le titre | Ouvre l'écran plein écran |
 | Glisser vers le haut | Ouvre l'écran plein écran |
 | Glisser à gauche / à droite | Titre suivant / précédent |
 

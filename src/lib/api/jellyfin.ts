@@ -3,6 +3,7 @@ import { browser } from '$app/environment';
 import { fetchWithTimeout, ApiError } from '$lib/http';
 import type { JellyfinConnection } from '$lib/stores/jellyfin.svelte';
 import type { JellyfinItem } from '$lib/types';
+import { rankFocusedMix, dominantGenres } from '$lib/mix';
 import {
 	isDemo,
 	demoAlbums,
@@ -522,9 +523,33 @@ export async function getFavoriteSongs(conn: JellyfinConnection): Promise<Jellyf
 	return data.Items ?? [];
 }
 
+/** Champs demandés pour le mix : les genres servent à resserrer la sélection. */
+const MIX_FIELDS = ITEM_FIELDS + ',Genres';
+
+/** Instant Mix brut de Jellyfin (titres partageant au moins un genre avec la graine). */
+async function getRawInstantMix(
+	conn: JellyfinConnection,
+	itemId: string,
+	limit: number
+): Promise<JellyfinItem[]> {
+	const data = await jfGet<{ Items?: JellyfinItem[] }>(
+		conn,
+		`/Items/${itemId}/InstantMix?${buildQuery({
+			UserId: conn.userId,
+			Fields: MIX_FIELDS,
+			Limit: limit
+		})}`
+	);
+	return data.Items ?? [];
+}
+
 /**
- * « Mix sans fin » : à partir d'un titre/album/artiste, Jellyfin construit une file de titres
- * similaires (Instant Mix, comme la radio de Symfonium/Plexamp).
+ * « Mix sans fin » : à partir d'un titre/album/artiste, construit une file de titres du MÊME
+ * PLAN SONORE. L'Instant Mix de Jellyfin seul est trop large (il accepte tout titre qui partage
+ * UN genre avec la graine : un artiste « Rock, Pop » ramène du metal comme de la variété). On
+ * récupère donc les genres de la graine, on ramène les titres qui les portent, puis on les classe
+ * par proximité (genres rares pondérés, genres étrangers pénalisés — voir `$lib/mix`). Repli sur
+ * l'Instant Mix brut si les genres sont absents ou si le résultat est trop maigre.
  */
 export async function getInstantMix(
 	conn: JellyfinConnection,
@@ -532,15 +557,80 @@ export async function getInstantMix(
 	limit = 100
 ): Promise<JellyfinItem[]> {
 	if (isDemo(conn)) return [...demoTracks()].sort(() => Math.random() - 0.5).slice(0, limit);
-	const data = await jfGet<{ Items?: JellyfinItem[] }>(
+	try {
+		const focused = await getFocusedMix(conn, itemId, limit);
+		if (focused.length >= Math.min(20, limit)) return focused;
+	} catch {
+		/* repli ci-dessous */
+	}
+	return getRawInstantMix(conn, itemId, limit);
+}
+
+async function getFocusedMix(
+	conn: JellyfinConnection,
+	itemId: string,
+	limit: number
+): Promise<JellyfinItem[]> {
+	const seed = await jfGet<JellyfinItem>(
 		conn,
-		`/Items/${itemId}/InstantMix?${buildQuery({
-			UserId: conn.userId,
-			Fields: ITEM_FIELDS,
-			Limit: limit
-		})}`
+		`/Users/${conn.userId}/Items/${itemId}?${buildQuery({ Fields: MIX_FIELDS })}`
 	);
-	return data.Items ?? [];
+
+	// Titres de la graine (artiste → ses titres, album → ses pistes, titre → lui seul).
+	let seedTracks: JellyfinItem[] = [];
+	if (seed.Type === 'Audio') seedTracks = [seed];
+	else if (seed.Type === 'MusicArtist' || seed.Type === 'MusicAlbum') {
+		const data = await jfGet<{ Items?: JellyfinItem[] }>(
+			conn,
+			itemsPath(conn.userId, {
+				...(seed.Type === 'MusicArtist' ? { ArtistIds: itemId } : { ParentId: itemId }),
+				IncludeItemTypes: 'Audio',
+				Recursive: 'true',
+				Fields: MIX_FIELDS,
+				Limit: 300
+			})
+		);
+		seedTracks = data.Items ?? [];
+	}
+
+	// Genres de la graine : les siens, sinon ceux qui dominent dans ses titres (un artiste
+	// Jellyfin n'a souvent pas de genre propre).
+	let seedGenres = seed.Genres ?? [];
+	if (seedGenres.length === 0) {
+		seedGenres = dominantGenres(seedTracks.map((t) => t.Genres ?? []));
+	}
+	if (seedGenres.length === 0) return [];
+
+	const [byGenre, instant] = await Promise.all([
+		jfGet<{ Items?: JellyfinItem[] }>(
+			conn,
+			itemsPath(conn.userId, {
+				IncludeItemTypes: 'Audio',
+				Recursive: 'true',
+				Genres: seedGenres.join('|'),
+				SortBy: 'Random',
+				Fields: MIX_FIELDS,
+				Limit: 400
+			})
+		).then((d) => d.Items ?? []),
+		getRawInstantMix(conn, itemId, 200).catch(() => [] as JellyfinItem[])
+	]);
+
+	const pool = new Map<string, JellyfinItem>();
+	for (const t of [...seedTracks, ...byGenre, ...instant]) pool.set(t.Id, t);
+
+	return rankFocusedMix(
+		seedGenres,
+		[...pool.values()].map((item) => ({
+			item,
+			genres: item.Genres ?? [],
+			artist: item.Artists?.[0] ?? item.AlbumArtist,
+			// Seul un titre unique est toujours gardé ; pour un artiste/album, ses titres
+			// concourent comme les autres (sinon ils noieraient le reste du mix).
+			isSeed: seed.Type === 'Audio' && item.Id === itemId
+		})),
+		{ limit }
+	);
 }
 
 /** Artistes similaires selon Jellyfin (basé sur les métadonnées/genres). */

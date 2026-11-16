@@ -16,7 +16,10 @@
 		remoteSupported = false,
 		onCastRemote,
 		jellyfinCastable = false,
-		onCastJellyfin
+		onCastJellyfin,
+		tab = $bindable('paroles'),
+		onSaveQueue,
+		canSaveQueue = false
 	}: {
 		open: boolean;
 		onClose: () => void;
@@ -28,9 +31,49 @@
 		onCastRemote?: () => void;
 		jellyfinCastable?: boolean;
 		onCastJellyfin?: (e: MouseEvent) => void;
+		/** Onglet affiché : le layout l'impose pour ouvrir directement la file depuis la barre. */
+		tab?: 'paroles' | 'file' | 'chapitres';
+		onSaveQueue?: () => void;
+		canSaveQueue?: boolean;
 	} = $props();
 
-	let tab = $state<'paroles' | 'file' | 'chapitres'>('paroles');
+	// ---- Glisser-déposer de la file d'attente (souris + tactile via Pointer Events) ----
+	let queueUl = $state<HTMLUListElement>();
+	let dragIndex = $state(-1);
+	function onQueueDragStart(e: PointerEvent, i: number) {
+		dragIndex = i;
+		(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+	}
+	function onQueueDragMove(e: PointerEvent) {
+		if (dragIndex < 0 || !queueUl) return;
+		const items = Array.from(queueUl.querySelectorAll('li'));
+		const y = e.clientY;
+		let target = items.length - 1;
+		for (let j = 0; j < items.length; j++) {
+			const r = items[j].getBoundingClientRect();
+			if (y < r.top + r.height / 2) {
+				target = j;
+				break;
+			}
+		}
+		if (target !== dragIndex) {
+			player.moveInQueue(dragIndex, target);
+			dragIndex = target;
+		}
+	}
+	function onQueueDragEnd() {
+		dragIndex = -1;
+	}
+	// Réordonnancement accessible au clavier depuis la poignée (↑/↓).
+	function onQueueHandleKey(e: KeyboardEvent, i: number) {
+		if (e.key === 'ArrowUp' && i > 0) {
+			e.preventDefault();
+			player.moveInQueue(i, i - 1);
+		} else if (e.key === 'ArrowDown' && i < player.queue.length - 1) {
+			e.preventDefault();
+			player.moveInQueue(i, i + 1);
+		}
+	}
 
 	// ---- Thème dynamique : couleurs extraites de la pochette courante ----
 	let colors = $state<AlbumColors | null>(null);
@@ -371,14 +414,30 @@
 				{:else}
 					<div class="np__queue">
 						{#if player.queue.length > 0}
-							<button type="button" class="np__clear" onclick={() => player.clearQueue()}>Vider la file</button>
+							<div class="np__qactions">
+								{#if canSaveQueue}
+									<button type="button" class="np__clear" onclick={() => onSaveQueue?.()} title="Enregistrer la file comme playlist Jellyfin">Enregistrer en playlist</button>
+								{/if}
+								<button type="button" class="np__clear" onclick={() => player.clearQueue()}>Vider la file</button>
+							</div>
 						{/if}
-						<ul>
+						<ul bind:this={queueUl}>
 							{#if player.queue.length === 0}
 								<li class="np__muted">File vide</li>
 							{:else}
 								{#each player.queue as track, i (track.id)}
-									<li class:is-current={i === player.currentIndex}>
+									<li class:is-current={i === player.currentIndex} class:is-dragging={i === dragIndex}>
+										<button
+											type="button"
+											class="np__drag"
+											aria-label="Réordonner (glisser, ou ↑/↓)"
+											title="Glisser pour réordonner"
+											onpointerdown={(e) => onQueueDragStart(e, i)}
+											onpointermove={onQueueDragMove}
+											onpointerup={onQueueDragEnd}
+											onpointercancel={onQueueDragEnd}
+											onkeydown={(e) => onQueueHandleKey(e, i)}
+										>⋮⋮</button>
 										<button type="button" class="np__jump" onclick={() => player.jumpTo(i)} title="Lire ce titre">{track.title}</button>
 										<button type="button" class="np__rm" onclick={() => player.removeFromQueue(track.id)} aria-label="Retirer">✕</button>
 									</li>
@@ -785,6 +844,29 @@
 		min-height: 0;
 		overflow-y: auto;
 		padding: 0.75rem;
+	}
+	.np__qactions {
+		display: flex;
+		gap: 0.9rem;
+		flex-wrap: wrap;
+	}
+	.np__drag {
+		flex-shrink: 0;
+		background: none;
+		border: none;
+		cursor: grab;
+		color: var(--metal-mid);
+		font-size: 0.7rem;
+		line-height: 1;
+		padding: 0 0.15rem;
+		letter-spacing: -2px;
+		touch-action: none; /* la poignée capte le geste au lieu de faire défiler */
+	}
+	.np__drag:hover {
+		color: var(--gold-bright);
+	}
+	.np__queue li.is-dragging {
+		opacity: 0.6;
 	}
 	.np__clear {
 		background: none;

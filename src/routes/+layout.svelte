@@ -50,15 +50,14 @@
 
 	let { children, data }: { children: import('svelte').Snippet; data: LayoutData } = $props();
 
-	// Lecteur repliable (web ET mobile) : boîtier complet quand ouvert, mini-lecteur (une
-	// ligne) quand réduit. Ouvert par défaut sur grand écran, réduit sur téléphone pour
-	// libérer l'espace. L'utilisateur bascule via le chevron du mini-lecteur / du boîtier.
-	let playerOpen = $state(typeof window !== 'undefined' ? window.innerWidth > 600 : true);
-	// File d'attente : ouverte en superposition au-dessus du boîtier (bouton dédié), car le
-	// format « Walkman » compact n'a plus de place pour la liste en permanence.
-	let queueOpen = $state(false);
 	// Écran « Lecture en cours » plein écran (pochette, seek, paroles, file…).
 	let nowPlayingOpen = $state(false);
+	// Onglet affiché à l'ouverture (le bouton ☰ de la barre ouvre directement la file).
+	let nowPlayingTab = $state<'paroles' | 'file' | 'chapitres'>('paroles');
+	function openNowPlaying(t: 'paroles' | 'file' = 'paroles') {
+		nowPlayingTab = t;
+		nowPlayingOpen = true;
+	}
 	let shortcutsOpen = $state(false);
 	// Palette de commandes (Ctrl/Cmd+K) : navigation et actions rapides.
 	let commandPaletteOpen = $state(false);
@@ -149,11 +148,11 @@
 		const dx = e.clientX - miniX;
 		const dy = e.clientY - miniY;
 		if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
-			nowPlayingOpen = true; // tap
+			openNowPlaying(); // tap
 			return;
 		}
 		if (dy < -50 && Math.abs(dy) > Math.abs(dx)) {
-			nowPlayingOpen = true; // glisser vers le haut
+			openNowPlaying(); // glisser vers le haut
 			return;
 		}
 		if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy)) {
@@ -162,43 +161,6 @@
 		}
 	}
 
-	// ---- Glisser-déposer de la file d'attente (souris + tactile via Pointer Events) ----
-	let queueUl = $state<HTMLUListElement>();
-	let dragIndex = $state(-1);
-	function onQueueDragStart(e: PointerEvent, i: number) {
-		dragIndex = i;
-		(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-	}
-	function onQueueDragMove(e: PointerEvent) {
-		if (dragIndex < 0 || !queueUl) return;
-		const items = Array.from(queueUl.querySelectorAll('li'));
-		const y = e.clientY;
-		let target = items.length - 1;
-		for (let j = 0; j < items.length; j++) {
-			const r = items[j].getBoundingClientRect();
-			if (y < r.top + r.height / 2) {
-				target = j;
-				break;
-			}
-		}
-		if (target !== dragIndex) {
-			player.moveInQueue(dragIndex, target);
-			dragIndex = target;
-		}
-	}
-	function onQueueDragEnd() {
-		dragIndex = -1;
-	}
-	// Réordonnancement accessible au clavier depuis la poignée (↑/↓).
-	function onQueueHandleKey(e: KeyboardEvent, i: number) {
-		if (e.key === 'ArrowUp' && i > 0) {
-			e.preventDefault();
-			player.moveInQueue(i, i - 1);
-		} else if (e.key === 'ArrowDown' && i < player.queue.length - 1) {
-			e.preventDefault();
-			player.moveInQueue(i, i + 1);
-		}
-	}
 	// Volume mémorisé avant coupure (raccourci « M »).
 	let preMuteVolume = 0.8;
 
@@ -1470,7 +1432,10 @@
 	<NowPlaying
 		open={nowPlayingOpen}
 		onClose={() => (nowPlayingOpen = false)}
+		bind:tab={nowPlayingTab}
 		onSeek={seekTo}
+		onSaveQueue={saveQueueAsPlaylist}
+		canSaveQueue={jellyfin.connected && player.queue.some((t) => t.source === 'jellyfin')}
 		onTogglePlay={togglePlayback}
 		{remoteSupported}
 		onCastRemote={promptRemote}
@@ -1592,210 +1557,105 @@
 			     écran « relie une source » à un visiteur qui n'a aucun serveur. -->
 			<DemoInvite enabled={Boolean(data.demoMode) && data.user?.id !== DEMO_ACCOUNT_ID} />
 			{@render children()}
+				<p class="app-version" title={`Tentacle v${appVersion} — commit ${appCommit} — build du ${appBuildDate}`}>
+					<span>v{appVersion} · {appCommit} · {appBuildDate}</span>
+					<span class="sep">·</span>
+					<a href={LICENCE_URL} target="_blank" rel="noopener noreferrer">{LICENCE_LABEL}</a>
+					<span class="sep">·</span>
+					<span>{FREE_LABEL} {DONATION_LABEL}</span>
+					{#if supportEnabled}
+						<span class="sep">·</span>
+						<!-- Lien direct : contrairement au widget flottant, il ne dépend d'aucun tiers
+						     et reste donc présent même si le script de Ko-fi ne charge pas. -->
+						<a href={kofiUrl()} target="_blank" rel="noopener noreferrer">{SUPPORT_LABEL}</a>
+					{/if}
+				</p>
 		{/if}
 	</main>
 
 	{#if !isAuthPage}
-	<footer class="player-bar" class:player-bar--open={playerOpen} aria-label="Lecteur audio">
-		<!-- Mini-lecteur : visible uniquement sur mobile. Une ligne compacte
-		     (pochette + titre + lecture/pause + suivant + bouton déplier). -->
+	<footer class="player-bar" aria-label="Lecteur audio">
+		<!-- Lecteur unique, fin : la progression est le liseré du haut (cliquable), le reste de
+		     l'écran « Lecture en cours » (pochette, paroles, file, vitesse, minuteur…) s'ouvre
+		     d'un toucher sur le titre ou via ▴. -->
 		<div class="player-mini">
-			<div class="player-mini__art" aria-hidden="true">
-				{#if player.current?.artworkUrl}
-					<img src={player.current.artworkUrl} alt="" />
+			<div class="pm-seek" style:--progress={isLiveStream ? '100%' : `${progressRatio * 100}%`}>
+				<div class="pm-seek__fill" aria-hidden="true"></div>
+				{#if !isLiveStream}
+					<input
+						type="range"
+						min="0"
+						max={player.durationSec || 0}
+						value={player.positionSec}
+						oninput={seek}
+						aria-label="Progression"
+					/>
 				{/if}
 			</div>
-			<!-- svelte-ignore a11y_no_static_element_interactions -->
-			<div
-				class="player-mini__info"
-				onpointerdown={onMiniDown}
-				onpointerup={onMiniUp}
-				title="Glisser : titre précédent/suivant · toucher ou glisser vers le haut : plein écran"
-			>
-				<strong>{player.current?.title ?? 'File vide'}</strong>
-				<small>{player.current?.subtitle ?? 'Ajoutez un morceau'}</small>
-			</div>
-			<button type="button" class="pixel-btn pixel-btn--play mini-play" onclick={togglePlayback} aria-label={player.playing ? 'Pause' : 'Lire'}>
-				{player.playing ? '⏸' : '▶'}
-			</button>
-			<button type="button" class="pixel-btn pixel-btn--ghost mini-next" onclick={() => player.next()} aria-label="Piste suivante">⏭</button>
-			<button
-				type="button"
-				class="pixel-btn pixel-btn--ghost mini-toggle"
-				aria-expanded={playerOpen}
-				onclick={() => (playerOpen = !playerOpen)}
-				aria-label={playerOpen ? 'Réduire le lecteur' : 'Déplier le lecteur'}
-				title={playerOpen ? 'Réduire le lecteur' : 'Déplier le lecteur'}
-			>{playerOpen ? '▾' : '▴'}</button>
-		</div>
 
-		<!-- Boîtier « Walkman » : façade métal usé, cassette à travers la vitre, boutons en bas.
-		     Décoratif mais fonctionnel — voir les commentaires. -->
-		<div class="walkman">
-			<div class="wk-top">
-				<div class="wk-left">
-					<div class="wk-brand">TENTACLE<span>///</span></div>
-					<div class="wk-sub">Stereo Cassette Player</div>
-					<div class="wk-grille" aria-hidden="true"></div>
-				</div>
-
-				<div class="wk-window">
-					{#if sleep.active}
-						<!-- Rappel permanent : le minuteur ne vivait que dans l'écran plein écran et
-						     la palette, donc on pouvait oublier qu'il tourne. Cliquer l'annule. -->
-						<button
-							type="button"
-							class="wk-sleep"
-							onclick={() => sleep.cancel()}
-							title="Minuteur de sommeil actif — cliquer pour annuler"
-						>
-							☾ {sleep.endOfTrack
-								? 'fin du titre'
-								: `${Math.ceil((sleep.remainingSec ?? 0) / 60)} min`}
-						</button>
+			<div class="player-mini__row">
+				<div class="player-mini__art" aria-hidden="true">
+					{#if player.current?.artworkUrl}
+						<img src={player.current.artworkUrl} alt="" />
 					{/if}
-					<div class="wk-cassette">
-						<span class="wk-reel" class:is-live={player.playing} aria-hidden="true"></span>
-						<button
-							type="button"
-							class="wk-label"
-							onclick={() => (nowPlayingOpen = true)}
-							title="Ouvrir le lecteur plein écran"
-							aria-label="Ouvrir le lecteur plein écran"
-						>
-							{#if player.current}
-								<div class="wk-title">{player.current.title}</div>
-								<div class="wk-artist">{player.current.subtitle}</div>
-							{:else}
-								<div class="wk-title wk-title--empty">File vide</div>
-								<div class="wk-artist">Ajoutez un morceau</div>
-							{/if}
-						</button>
-						<span class="wk-reel" class:is-live={player.playing} aria-hidden="true"></span>
-					</div>
-
-					<!-- Ruban = barre de progression cliquable (input range transparent par-dessus). -->
-					<div class="wk-seek" style:--progress={isLiveStream ? '100%' : `${progressRatio * 100}%`}>
-						<div class="wk-seek__tape" aria-hidden="true"></div>
-						{#if !isLiveStream}
-							<input
-								type="range"
-								min="0"
-								max={player.durationSec || 0}
-								value={player.positionSec}
-								oninput={seek}
-								aria-label="Progression"
-							/>
-						{/if}
-					</div>
-					<div class="wk-time">
-						<span>{formatTime(player.positionSec)}</span>
-						{#if isLiveStream}
-							<span class="wk-live" class:is-on={player.playing}>● DIRECT</span>
-						{:else}
-							<span>{formatTime(player.durationSec)}</span>
-						{/if}
-					</div>
-
-					<div class="wk-glass" aria-hidden="true"></div>
+				</div>
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div
+					class="player-mini__info"
+					onpointerdown={onMiniDown}
+					onpointerup={onMiniUp}
+					title="Glisser : titre précédent/suivant · toucher ou glisser vers le haut : plein écran"
+				>
+					<strong>{player.current?.title ?? 'File vide'}</strong>
+					<small>{player.current?.subtitle ?? 'Ajoutez un morceau'}</small>
 				</div>
 
-				<div class="wk-right">
+				{#if sleep.active}
 					<button
 						type="button"
-						class="wk-collapse"
-						onclick={() => (playerOpen = false)}
-						aria-label="Réduire le lecteur"
-						title="Réduire le lecteur"
-					>▾</button>
-					<div class="wk-meter" class:is-live={player.playing} aria-hidden="true">
-						<i></i><i></i><i></i><i></i><i></i>
-					</div>
-					<div class="wk-vol">
-						<input type="range" min="0" max="1" step="0.01" value={player.volume} oninput={setVolume} aria-label="Volume" />
-						<small>VOL</small>
-					</div>
-					<div class="wk-power">
-						<span class="wk-led" class:on={player.playing}></span>
-						<small>POWER</small>
-					</div>
-				</div>
-			</div>
-
-			<div class="wk-deck" aria-label="Commandes de lecture">
-				<button type="button" class="wk-btn" class:is-active={player.shuffle} aria-pressed={player.shuffle} onclick={() => player.toggleShuffle()} aria-label="Lecture aléatoire" title="Lecture aléatoire">
-					<span class="wk-btn__led" class:on={player.shuffle}></span><span class="wk-btn__gl">⇄</span>
-				</button>
-				<button type="button" class="wk-btn" onclick={() => player.prev()} aria-label="Piste précédente">
-					<span class="wk-btn__led"></span><span class="wk-btn__gl">⏮</span>
-				</button>
-				<button type="button" class="wk-btn wk-btn--play" onclick={togglePlayback} aria-label={player.playing ? 'Pause' : 'Lire'}>
-					<span class="wk-btn__led on"></span><span class="wk-btn__gl">{player.playing ? '⏸' : '▶'}</span>
-				</button>
-				<button type="button" class="wk-btn" onclick={() => player.next()} aria-label="Piste suivante">
-					<span class="wk-btn__led"></span><span class="wk-btn__gl">⏭</span>
-				</button>
-				<button type="button" class="wk-btn" class:is-active={player.repeat !== 'off'} aria-pressed={player.repeat !== 'off'} onclick={() => player.cycleRepeat()} aria-label={repeatLabel} title={repeatLabel}>
-					<span class="wk-btn__led" class:on={player.repeat !== 'off'}></span><span class="wk-btn__gl">{player.repeat === 'one' ? '↻¹' : '↻'}</span>
-				</button>
-				<button type="button" class="wk-btn wk-btn--queue" class:is-active={queueOpen} aria-expanded={queueOpen} onclick={() => (queueOpen = !queueOpen)} aria-label="File d'attente" title="File d'attente">
-					<span class="wk-btn__led" class:on={player.queue.length > 0}></span><span class="wk-btn__gl">☰</span>
-					{#if player.queue.length > 0}<span class="wk-btn__badge">{player.queue.length}</span>{/if}
-				</button>
-			</div>
-
-			{#if queueOpen}
-				<div class="wk-queue scanlines">
-					<div class="wk-queue__head">
-						<span class="label-tag">File d'attente</span>
-						{#if player.queue.length > 0}
-							<span class="wk-queue__actions">
-								{#if jellyfin.connected && player.queue.some((t) => t.source === 'jellyfin')}
-									<button type="button" class="queue-clear" onclick={saveQueueAsPlaylist} title="Enregistrer la file comme playlist Jellyfin">Playlist</button>
-								{/if}
-								<button type="button" class="queue-clear" onclick={() => player.clearQueue()} title="Vider la file">Vider</button>
-							</span>
-						{/if}
-					</div>
-					<ul bind:this={queueUl}>
-						{#if player.queue.length === 0}
-							<li class="queue-empty">File vide</li>
-						{:else}
-							{#each player.queue as track, i (track.id)}
-								<li class:is-current={i === player.currentIndex} class:is-dragging={i === dragIndex}>
-									<button
-										type="button"
-										class="queue-drag"
-										aria-label="Réordonner (glisser, ou ↑/↓)"
-										title="Glisser pour réordonner"
-										onpointerdown={(e) => onQueueDragStart(e, i)}
-										onpointermove={onQueueDragMove}
-										onpointerup={onQueueDragEnd}
-										onpointercancel={onQueueDragEnd}
-										onkeydown={(e) => onQueueHandleKey(e, i)}
-									>⋮⋮</button>
-									<button type="button" class="queue-jump" onclick={() => player.jumpTo(i)} title="Lire ce titre">{track.title}</button>
-									<button type="button" class="queue-remove" onclick={() => player.removeFromQueue(track.id)} aria-label="Retirer de la file" title="Retirer">✕</button>
-								</li>
-							{/each}
-						{/if}
-					</ul>
-				</div>
-			{/if}
-
-			<p class="app-version" title={`Tentacle v${appVersion} — commit ${appCommit} — build du ${appBuildDate}`}>
-				<span>v{appVersion} · {appCommit} · {appBuildDate}</span>
-				<span class="sep">·</span>
-				<a href={LICENCE_URL} target="_blank" rel="noopener noreferrer">{LICENCE_LABEL}</a>
-				<span class="sep">·</span>
-				<span>{FREE_LABEL} {DONATION_LABEL}</span>
-				{#if supportEnabled}
-					<span class="sep">·</span>
-					<!-- Lien direct : contrairement au widget flottant, il ne dépend d'aucun tiers
-					     et reste donc présent même si le script de Ko-fi ne charge pas. -->
-					<a href={kofiUrl()} target="_blank" rel="noopener noreferrer">{SUPPORT_LABEL}</a>
+						class="pm-sleep"
+						onclick={() => sleep.cancel()}
+						title="Minuteur de sommeil actif — cliquer pour annuler"
+					>
+						☾ {sleep.endOfTrack ? 'fin du titre' : `${Math.ceil((sleep.remainingSec ?? 0) / 60)} min`}
+					</button>
 				{/if}
-			</p>
+
+				<span class="pm-time">
+					{formatTime(player.positionSec)}{isLiveStream ? ' · DIRECT' : ` / ${formatTime(player.durationSec)}`}
+				</span>
+
+				<input
+					class="pm-vol"
+					type="range"
+					min="0"
+					max="1"
+					step="0.01"
+					value={player.volume}
+					oninput={setVolume}
+					aria-label="Volume"
+				/>
+
+				<button type="button" class="pixel-btn pixel-btn--ghost pm-prev" onclick={() => player.prev()} aria-label="Piste précédente">⏮</button>
+				<button type="button" class="pixel-btn pixel-btn--play mini-play" onclick={togglePlayback} aria-label={player.playing ? 'Pause' : 'Lire'}>
+					{player.playing ? '⏸' : '▶'}
+				</button>
+				<button type="button" class="pixel-btn pixel-btn--ghost mini-next" onclick={() => player.next()} aria-label="Piste suivante">⏭</button>
+				<button
+					type="button"
+					class="pixel-btn pixel-btn--ghost pm-queue"
+					onclick={() => openNowPlaying('file')}
+					aria-label="File d'attente"
+					title="File d'attente"
+				>☰{#if player.queue.length > 0}<span class="pm-badge">{player.queue.length}</span>{/if}</button>
+				<button
+					type="button"
+					class="pixel-btn pixel-btn--ghost mini-toggle"
+					onclick={() => openNowPlaying()}
+					aria-label="Ouvrir le lecteur plein écran"
+					title="Ouvrir le lecteur plein écran"
+				>▴</button>
+			</div>
 		</div>
 	</footer>
 	{/if}
@@ -2093,10 +1953,10 @@
 		margin: 3rem 0;
 	}
 
-	/* ---- Player : boîtier « Walkman » pixel-art ---- */
+	/* ---- Player ---- */
 
 	.player-bar {
-		/* Dernier enfant du shell à hauteur fixe : reste toujours en bas, visible en
+		/* Barre fine : dernier enfant du shell à hauteur fixe : reste toujours en bas, visible en
 		   permanence (plus besoin de sticky, qui « décrochait » sur les longues listes). */
 		flex-shrink: 0;
 		z-index: 20;
@@ -2114,402 +1974,95 @@
 		box-shadow: var(--playerbar-shadow, 0 6px 0 0 inset var(--shadow));
 	}
 
-	/* Façade : métal patiné (dithering) + biseau craquant + scanlines. */
-	.walkman {
-		position: relative;
+	.pixel-btn--play {
+		min-width: 3.4rem;
+		font-size: 1.05rem;
+	}
+
+	/* ---- Lecteur : barre fine (le plein écran vit dans NowPlaying) ---- */
+	.player-mini {
 		display: flex;
 		flex-direction: column;
-		gap: 0.7rem;
-		/* Largeur exacte du contenu = max-width de .app-main (72rem) moins ses 2 × 1.5rem de
-		   marge intérieure = 69rem, centré. Combiné au padding 1.5rem du footer, le boîtier
-		   s'aligne pile sur la bibliothèque et les autres panneaux, à toutes les largeurs. */
+		gap: 0.5rem;
 		max-width: 69rem;
-		width: 100%;
 		margin: 0 auto;
-		padding: 0.85rem;
-		background:
-			repeating-linear-gradient(45deg, rgba(0, 0, 0, 0.09) 0 2px, transparent 2px 4px),
-			repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.025) 0 2px, transparent 2px 4px),
-			var(--panel);
-		border: 3px solid var(--bezel);
-		box-shadow:
-			inset 3px 3px 0 0 rgba(255, 255, 255, 0.1),
-			inset -3px -3px 0 0 rgba(0, 0, 0, 0.5),
-			inset 0 0 0 6px var(--panel-lo);
-	}
-	.walkman::after {
-		content: '';
-		position: absolute;
-		inset: 0;
-		pointer-events: none;
-		background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.16) 0 2px, transparent 2px 4px);
 	}
 
-	.wk-top {
-		display: flex;
-		gap: 0.75rem;
-		align-items: stretch;
-	}
-
-	/* ---- Gauche : marque + grille ---- */
-	.wk-left {
-		width: 180px;
-		flex-shrink: 0;
-		display: flex;
-		flex-direction: column;
-		gap: 0.4rem;
-		min-width: 0;
-	}
-	.wk-brand {
-		font-family: var(--font-pixel);
-		font-weight: 700;
-		font-size: 1.35rem;
-		letter-spacing: 0.08em;
-		color: var(--gold-bright);
-		text-shadow: 2px 2px 0 var(--bezel);
-	}
-	.wk-brand span {
-		color: var(--teal);
-		font-size: 0.8rem;
-		margin-left: 4px;
-	}
-	.wk-sub {
-		font-size: 0.6rem;
-		letter-spacing: 0.2em;
-		text-transform: uppercase;
-		color: var(--teal);
-		margin-top: -2px;
-	}
-	.wk-grille {
-		margin-top: auto;
-		min-height: 3.4rem;
-		border: 3px solid var(--bezel);
-		background-color: var(--plum-deep);
-		background-image: radial-gradient(var(--metal-dark) 1px, transparent 1.7px);
-		background-size: 10px 10px;
-		background-position: 5px 5px;
-		box-shadow: inset 2px 2px 0 rgba(0, 0, 0, 0.5);
-	}
-
-	/* ---- Centre : fenêtre + cassette ---- */
-	.wk-sleep {
-		position: absolute;
-		top: 3px;
-		right: 3px;
-		z-index: 2;
-		font-family: var(--font-pixel);
-		font-size: 0.6rem;
-		letter-spacing: 0.04em;
-		background: var(--plum-deep);
-		color: var(--gold-bright);
-		border: 1px solid var(--gold);
-		border-radius: var(--radius-chip, 0);
-		padding: 0.1rem 0.3rem;
-		cursor: pointer;
-	}
-	.wk-sleep:hover {
-		background: var(--gold);
-		color: var(--ink);
-	}
-
-	.wk-window {
-		flex: 1;
-		min-width: 0;
-		position: relative;
-		display: flex;
-		flex-direction: column;
-		gap: 0.45rem;
-		padding: 0.6rem;
-		background: var(--shadow);
-		border: 3px solid var(--bezel);
-		box-shadow: inset 3px 3px 0 rgba(0, 0, 0, 0.6);
-		overflow: hidden;
-	}
-	.wk-cassette {
+	.player-mini__row {
 		display: flex;
 		align-items: center;
-		gap: 0.6rem;
-	}
-	.wk-reel {
-		width: 54px;
-		height: 54px;
-		flex-shrink: 0;
-		position: relative;
-		background: var(--plum-deep);
-		border: 3px solid var(--bezel);
-		box-shadow: inset 2px 2px 0 rgba(255, 255, 255, 0.06);
-	}
-	.wk-reel::before {
-		content: '';
-		position: absolute;
-		inset: 5px;
-		background: repeating-conic-gradient(
-			from 0deg,
-			var(--metal-mid) 0 22.5deg,
-			var(--panel) 22.5deg 45deg
-		);
-		-webkit-mask: radial-gradient(circle, transparent 26%, #000 27% 92%, transparent 93%);
-		mask: radial-gradient(circle, transparent 26%, #000 27% 92%, transparent 93%);
-	}
-	.wk-reel.is-live::before {
-		animation: wk-spin 3s steps(8) infinite;
-	}
-	.wk-reel::after {
-		content: '';
-		position: absolute;
-		inset: 21px;
-		background: var(--shadow);
-		box-shadow: 0 0 0 2px var(--panel);
-	}
-	.wk-label {
-		flex: 1;
-		min-width: 0;
-		display: block;
-		text-align: center;
-		cursor: pointer;
-		font-family: var(--font-pixel);
-		padding: 0.5rem 0.6rem;
-		background: var(--cream);
-		border: none;
-		border-top: 3px solid var(--cream-bright);
-		border-bottom: 3px solid var(--metal-dark);
-	}
-	.wk-label:hover {
-		background: var(--cream-bright);
-	}
-	.wk-title {
-		font-size: 1.05rem;
-		color: var(--ink);
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-	.wk-title--empty {
-		color: var(--metal-dark);
-	}
-	.wk-artist {
-		font-size: 0.68rem;
-		letter-spacing: 0.06em;
-		color: var(--metal-dark);
-		margin-top: 2px;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
+		gap: 0.5rem;
 	}
 
-	/* Ruban = progression cliquable (blocs pixel via dégradé sur --progress + curseur). */
-	.wk-seek {
+	/* Liseré de progression : 4 px visibles, zone cliquable plus haute (input transparent). */
+	.pm-seek {
 		position: relative;
 		height: 14px;
-		border: 3px solid var(--bezel);
-		background:
-			repeating-linear-gradient(90deg, transparent 0 3px, rgba(0, 0, 0, 0.18) 3px 4px),
-			linear-gradient(
-				90deg,
-				var(--gold-bright) 0,
-				var(--gold) var(--progress, 0%),
-				var(--plum-deep) var(--progress, 0%)
-			);
-		box-shadow: inset 0 2px 0 rgba(0, 0, 0, 0.5);
+		margin-top: -0.2rem;
 	}
-	.wk-seek__tape {
-		display: none;
-	}
-	.wk-seek::after {
+	.pm-seek::before {
 		content: '';
 		position: absolute;
-		top: -3px;
-		bottom: -3px;
-		left: var(--progress, 0%);
-		width: 4px;
-		transform: translateX(-2px);
-		background: var(--cream-bright);
-		box-shadow: 0 0 6px 0 var(--glow);
-		pointer-events: none;
+		left: 0;
+		right: 0;
+		top: 5px;
+		height: 4px;
+		background: var(--plum);
+		box-shadow: inset 0 0 0 1px var(--bezel);
 	}
-	.wk-seek input[type='range'] {
+	.pm-seek__fill {
+		position: absolute;
+		left: 0;
+		top: 5px;
+		height: 4px;
+		width: var(--progress, 0%);
+		background: repeating-linear-gradient(90deg, var(--gold-bright) 0 3px, var(--gold) 3px 4px);
+	}
+	.pm-seek input[type='range'] {
 		position: absolute;
 		inset: 0;
 		width: 100%;
 		height: 100%;
+		margin: 0;
 		opacity: 0;
 		cursor: pointer;
-		margin: 0;
 	}
-	.wk-time {
-		display: flex;
-		justify-content: space-between;
-		font-size: 0.62rem;
-		letter-spacing: 0.06em;
-		color: var(--teal);
-	}
-	.wk-live {
-		color: var(--muted);
-	}
-	.wk-live.is-on {
-		color: var(--coral);
-		text-shadow: 0 0 8px var(--coral);
-		animation: lamp-blink 3s steps(1) infinite;
-	}
-	/* Reflet vitre : bandes nettes en biais (pas de dégradé lisse). */
-	.wk-glass {
+	.pm-seek:focus-within::after {
+		content: '';
 		position: absolute;
-		inset: 0;
+		inset: 3px -2px;
+		outline: 2px solid var(--gold-bright);
 		pointer-events: none;
-		background: linear-gradient(
-			120deg,
-			transparent 0 46%,
-			rgba(255, 255, 255, 0.06) 46% 49%,
-			transparent 49% 55%,
-			rgba(255, 255, 255, 0.04) 55% 57%,
-			transparent 57%
-		);
 	}
 
-	/* ---- Droite : vumètre + volume + power ---- */
-	.wk-right {
-		width: 66px;
+	.pm-time {
 		flex-shrink: 0;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: space-between;
-		gap: 0.5rem;
+		font-size: 0.68rem;
+		color: var(--muted);
+		font-variant-numeric: tabular-nums;
 	}
-	.wk-meter {
-		display: flex;
-		flex-direction: column;
-		gap: 3px;
-		align-items: flex-end;
-		width: 100%;
+	.pm-vol {
+		flex-shrink: 0;
+		width: 6rem;
+		accent-color: var(--gold-bright);
 	}
-	.wk-meter i {
-		height: 5px;
-		background: var(--metal-dark);
-	}
-	.wk-meter.is-live i {
-		background: var(--gold-bright);
-		box-shadow: 0 0 5px var(--glow);
-		animation: wk-meter 0.8s steps(3) infinite alternate;
-	}
-	.wk-meter i:nth-child(1) { width: 60%; }
-	.wk-meter i:nth-child(2) { width: 100%; animation-delay: 0.1s; }
-	.wk-meter i:nth-child(3) { width: 45%; animation-delay: 0.25s; }
-	.wk-meter i:nth-child(4) { width: 80%; animation-delay: 0.15s; }
-	.wk-meter i:nth-child(5) { width: 30%; animation-delay: 0.3s; }
-	.wk-vol {
-		width: 100%;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 3px;
-	}
-	.wk-vol input[type='range'] {
-		-webkit-appearance: none;
-		appearance: none;
-		width: 100%;
-		height: 12px;
-		margin: 0;
-		cursor: pointer;
-		background: repeating-linear-gradient(90deg, var(--plum-deep) 0 3px, var(--panel-hi) 3px 6px);
+	.pm-sleep {
+		flex-shrink: 0;
+		background: none;
 		border: 2px solid var(--bezel);
-	}
-	.wk-vol input[type='range']::-webkit-slider-thumb {
-		-webkit-appearance: none;
-		width: 8px;
-		height: 16px;
-		background: var(--gold-bright);
-		border: 2px solid var(--bezel);
-	}
-	.wk-vol input[type='range']::-moz-range-thumb {
-		width: 8px;
-		height: 16px;
-		border-radius: 0;
-		background: var(--gold-bright);
-		border: 2px solid var(--bezel);
-	}
-	.wk-vol small,
-	.wk-power small {
-		font-size: 0.5rem;
-		letter-spacing: 0.14em;
-		color: var(--metal-mid);
-	}
-	.wk-power {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 3px;
-	}
-	.wk-led {
-		width: 12px;
-		height: 12px;
-		background: var(--metal-dark);
-		box-shadow: inset -2px -2px 0 rgba(0, 0, 0, 0.4);
-	}
-	.wk-led.on {
-		background: var(--coral);
-		box-shadow: 0 0 8px var(--coral), inset -2px -2px 0 rgba(0, 0, 0, 0.4);
-	}
-
-	/* ---- Boutons en bas : blocs crantés + LED témoin ---- */
-	.wk-deck {
-		display: flex;
-		gap: 0.5rem;
-	}
-	.wk-btn {
-		flex: 1;
-		position: relative;
-		height: 50px;
-		display: grid;
-		place-items: center;
-		cursor: pointer;
+		color: var(--gold-bright);
 		font-family: var(--font-pixel);
-		font-size: 1rem;
-		color: var(--cream);
-		background: var(--panel-hi);
-		border: 3px solid var(--bezel);
-		box-shadow:
-			inset 2px 2px 0 rgba(255, 255, 255, 0.14),
-			inset -2px -3px 0 rgba(0, 0, 0, 0.5),
-			0 4px 0 var(--bezel);
+		font-size: 0.62rem;
+		padding: 0.15rem 0.4rem;
+		cursor: pointer;
 	}
-	.wk-btn:active {
-		transform: translateY(2px);
-		box-shadow: inset 2px 2px 0 rgba(255, 255, 255, 0.14), inset -2px -3px 0 rgba(0, 0, 0, 0.5), 0 2px 0 var(--bezel);
+	.pm-sleep:hover {
+		color: var(--coral);
 	}
-	.wk-btn__led {
-		position: absolute;
-		top: 5px;
-		left: 50%;
-		transform: translateX(-50%);
-		width: 20px;
-		height: 4px;
-		background: var(--plum-deep);
+	.pm-queue {
+		position: relative;
 	}
-	.wk-btn__led.on {
-		background: var(--gold-bright);
-		box-shadow: 0 0 6px var(--glow);
-	}
-	.wk-btn__gl {
-		margin-top: 4px;
-	}
-	.wk-btn.is-active {
-		color: var(--cream-bright);
-		background: var(--panel);
-	}
-	.wk-btn--play {
-		color: var(--ink);
-		background: var(--gold-bright);
-		box-shadow:
-			inset 2px 2px 0 rgba(255, 255, 255, 0.5),
-			inset -2px -3px 0 rgba(168, 84, 47, 0.7),
-			0 4px 0 var(--rust);
-	}
-	.wk-btn--play:active {
-		transform: translateY(2px);
-		box-shadow: inset 2px 2px 0 rgba(255, 255, 255, 0.5), inset -2px -3px 0 rgba(168, 84, 47, 0.7), 0 2px 0 var(--rust);
-	}
-	.wk-btn__badge {
+	.pm-badge {
 		position: absolute;
 		top: -6px;
 		right: -6px;
@@ -2522,161 +2075,6 @@
 		background: var(--coral);
 		color: var(--ink);
 		border: 2px solid var(--bezel);
-	}
-
-	/* ---- File d'attente (superposée) ---- */
-	.wk-queue {
-		position: relative; /* ancre la superposition .scanlines */
-		border: 3px solid var(--bezel);
-		background: var(--plum-deep);
-		padding: 0.5rem 0.6rem;
-		box-shadow: inset 2px 2px 0 rgba(0, 0, 0, 0.5);
-	}
-	.wk-queue__head {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 0.5rem;
-		margin-bottom: 0.35rem;
-	}
-	.wk-queue__actions {
-		display: flex;
-		gap: 0.4rem;
-	}
-	.wk-queue ul {
-		list-style: none;
-		margin: 0;
-		padding: 0;
-		max-height: 9rem;
-		overflow-y: auto;
-		font-size: 0.78rem;
-	}
-	.wk-queue li {
-		display: flex;
-		align-items: center;
-		gap: 0.4rem;
-		color: var(--muted);
-		padding: 0.1rem 0;
-	}
-	.wk-queue li.is-current {
-		color: var(--gold-bright);
-	}
-
-	@keyframes wk-spin {
-		to { transform: rotate(360deg); }
-	}
-	@keyframes wk-meter {
-		from { opacity: 0.55; }
-		to { opacity: 1; }
-	}
-	@media (prefers-reduced-motion: reduce) {
-		.wk-reel.is-live::before,
-		.wk-meter.is-live i {
-			animation: none;
-		}
-	}
-
-	.pixel-btn--play {
-		min-width: 3.4rem;
-		font-size: 1.05rem;
-	}
-
-	.queue-clear {
-		background: none;
-		border: none;
-		cursor: pointer;
-		color: var(--muted);
-		font-family: var(--font-pixel);
-		font-size: 0.6rem;
-		text-transform: uppercase;
-		letter-spacing: 0.08em;
-		padding: 0.1rem 0.3rem;
-	}
-
-	.queue-clear:hover {
-		color: var(--coral);
-	}
-
-	.queue-jump {
-		flex: 1;
-		min-width: 0;
-		background: none;
-		border: none;
-		cursor: pointer;
-		text-align: left;
-		color: inherit;
-		font-family: var(--font-pixel);
-		font-size: inherit;
-		padding: 0;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-
-	.queue-jump:hover {
-		color: var(--gold-bright);
-	}
-
-	li.is-current .queue-jump::before {
-		content: '▶ ';
-		font-size: 0.65rem;
-	}
-
-	.queue-drag {
-		flex-shrink: 0;
-		background: none;
-		border: none;
-		cursor: grab;
-		color: var(--metal-mid);
-		font-size: 0.7rem;
-		line-height: 1;
-		padding: 0 0.15rem;
-		letter-spacing: -2px;
-		touch-action: none; /* la poignée capte le geste au lieu de faire défiler */
-	}
-
-	.queue-drag:hover {
-		color: var(--gold-bright);
-	}
-
-	.wk-queue li.is-dragging {
-		opacity: 0.6;
-		background: var(--plum);
-	}
-
-	.queue-remove {
-		flex-shrink: 0;
-		background: none;
-		border: none;
-		cursor: pointer;
-		color: var(--metal-mid);
-		font-size: 0.7rem;
-		line-height: 1;
-		padding: 0.1rem 0.25rem;
-	}
-
-	.queue-remove:hover {
-		color: var(--coral);
-	}
-
-	.queue-empty {
-		color: var(--muted);
-	}
-
-	/* Mini-lecteur (mode réduit) : affiché quand le boîtier est replié, masqué quand ouvert —
-	   sur web comme sur mobile. Le boîtier fait l'inverse. */
-	.player-mini {
-		display: none;
-		align-items: center;
-		gap: 0.5rem;
-		max-width: 69rem;
-		margin: 0 auto;
-	}
-	.player-bar:not(.player-bar--open) .player-mini {
-		display: flex;
-	}
-	.player-bar:not(.player-bar--open) .walkman {
-		display: none;
 	}
 
 	.player-mini__art {
@@ -2726,23 +2124,10 @@
 		padding: 0.4rem 0.6rem;
 	}
 
-	.wk-collapse {
-		align-self: flex-end;
-		background: none;
-		border: none;
-		cursor: pointer;
-		color: var(--metal-mid);
-		font-size: 0.85rem;
-		line-height: 1;
-		padding: 0 0.2rem;
-	}
-
-	.wk-collapse:hover {
-		color: var(--gold-bright);
-	}
-
 	.app-version {
-		margin: 0.5rem 0 0;
+		/* Dernier élément du contenu défilant (la barre du lecteur reste fine). */
+		margin: auto 0 0;
+		padding-top: 1rem;
 		font-size: 0.6rem;
 		letter-spacing: 0.08em;
 		color: var(--metal-mid);
@@ -2839,54 +2224,13 @@
 			padding: 0.6rem 0.75rem 0.65rem;
 		}
 
-		/* Boîtier compact sur téléphone : colonnes empilées, grille masquée. */
-		.wk-top {
-			flex-direction: column;
-		}
-
-		.wk-left {
-			width: 100%;
-		}
-
-		.wk-grille {
+		/* Barre réduite à l'essentiel sur téléphone : volume (touches matérielles), précédent
+		   (glisser le titre) et durée sont dans l'écran plein écran. */
+		.pm-vol,
+		.pm-prev,
+		.pm-time {
 			display: none;
 		}
 
-		.wk-right {
-			width: 100%;
-			flex-direction: row;
-			justify-content: space-between;
-			align-items: center;
-		}
-
-		.wk-meter {
-			width: auto;
-			flex-direction: row;
-			align-items: flex-end;
-			height: 22px;
-		}
-
-		.wk-meter i {
-			width: 5px !important;
-			align-self: stretch;
-		}
-
-		.wk-vol {
-			flex: 1;
-			max-width: 160px;
-		}
-
-		.wk-reel {
-			width: 40px;
-			height: 40px;
-		}
-
-		.wk-reel::after {
-			inset: 15px;
-		}
-
-		.wk-title {
-			font-size: 0.9rem;
-		}
 	}
 </style>

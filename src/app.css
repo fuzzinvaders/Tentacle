@@ -537,6 +537,13 @@ input[type='range']::-moz-range-thumb {
 	border: 2px solid var(--bezel);
 }
 
+/* Widget de dons Ko-fi (script tiers, voir +layout.svelte) : posé par défaut à 16 px du bas,
+   il recouvrirait le titre dans la barre du lecteur. On le remonte juste au-dessus de la barre. */
+.floatingchat-container-wrap,
+.floatingchat-container-wrap-mobi {
+	bottom: calc(6.5rem + env(safe-area-inset-bottom)) !important;
+}
+
 .visually-hidden {
 	position: absolute;
 	width: 1px;

@@ -89,6 +89,8 @@ export type JellyfinItem = {
 	ProductionYear?: number;
 	ChildCount?: number;
 	UserData?: { IsFavorite?: boolean; PlaybackPositionTicks?: number };
+	/** Genres (rempli seulement si demandé via `Fields=Genres`). */
+	Genres?: string[];
 	/** Identifiants externes (rempli si la bibliothèque est taguée) — ex. MusicBrainzArtist. */
 	ProviderIds?: Record<string, string>;
 };
