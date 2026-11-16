@@ -232,16 +232,17 @@ l'écran plein écran : liste horodatée, chapitre courant surligné, clic pour 
 
 ### La barre du lecteur
 
-Une seule ligne, toujours visible en bas : pochette, titre et artiste, puis les commandes. Il n'y a
-volontairement **que deux formats** : cette barre fine (qui laisse toute la place à la navigation)
-et l'écran plein écran ci-dessous.
+Un **walkman en format fin**, toujours visible en bas : une cassette (deux bobines qui tournent
+pendant la lecture, de part et d'autre de l'étiquette avec le titre et l'artiste), un ruban de
+progression et des boutons à LED. Il n'y a volontairement **que deux formats** : cette barre (qui
+laisse toute la place à la navigation) et l'écran plein écran ci-dessous.
 
-- **Liseré de progression** tout en haut de la barre : cliquer ou glisser pour se déplacer (plein
-  pour une radio en direct). Le temps écoulé / total est affiché à droite du titre (écran large).
-- **Transport** : **⏮** précédent (écran large) · **▶/⏸** · **⏭** · **☰** file d'attente, avec un
-  **badge indiquant le nombre de titres** · **▴** ouvre le plein écran.
-- **Volume** : curseur dans la barre sur écran large (sur téléphone : touches de volume, ou
-  l'écran plein écran).
+- **Ruban de progression** sous la cassette : cliquer ou glisser pour se déplacer, temps écoulé /
+  total — ou `● DIRECT` pour une radio.
+- **Transport** : **⏮** précédent · **▶/⏸** · **⏭** · **☰** file d'attente, avec un **badge indiquant
+  le nombre de titres** · **▴** ouvre le plein écran.
+- **Volume** : curseur à gauche des boutons sur écran large (sur téléphone : touches de volume, ou
+  l'écran plein écran). Sur téléphone, bobines et précédent sont masqués (glisser l'étiquette).
 - Un badge **☾** apparaît quand un **minuteur de sommeil** est armé (avec le temps restant) —
   cliquer dessus l'annule.
 - Aléatoire, répétition, vitesse, paroles… sont dans l'écran plein écran.

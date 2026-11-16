@@ -44,7 +44,7 @@ affiché.
 
 ## Quelques fonctions
 
-- Lecteur pixel-art : barre fine toujours visible + écran plein écran teinté par la pochette
+- Lecteur walkman pixel-art : barre fine toujours visible + écran plein écran teinté par la pochette
 - **Paroles synchronisées** (LRCLIB) et **chapitres** de podcasts (Podcasting 2.0)
 - Égaliseur 5 bandes, fondu enchaîné, normalisation du volume, vitesse de lecture
 - Vitesse et **saut d'intro/outro mémorisés par podcast**

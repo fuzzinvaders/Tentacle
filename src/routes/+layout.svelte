@@ -1575,45 +1575,37 @@
 
 	{#if !isAuthPage}
 	<footer class="player-bar" aria-label="Lecteur audio">
-		<!-- Lecteur unique, fin : la progression est le liseré du haut (cliquable), le reste de
-		     l'écran « Lecture en cours » (pochette, paroles, file, vitesse, minuteur…) s'ouvre
-		     d'un toucher sur le titre ou via ▴. -->
+		<!-- Walkman en format fin : même façade, même cassette (bobines + étiquette) et mêmes
+		     boutons à LED que l'ancien boîtier, sur une seule ligne. Les réglages avancés
+		     (aléatoire, répétition, vitesse, paroles, file…) sont dans le plein écran. -->
 		<div class="player-mini">
-			<div class="pm-seek" style:--progress={isLiveStream ? '100%' : `${progressRatio * 100}%`}>
-				<div class="pm-seek__fill" aria-hidden="true"></div>
-				{#if !isLiveStream}
-					<input
-						type="range"
-						min="0"
-						max={player.durationSec || 0}
-						value={player.positionSec}
-						oninput={seek}
-						aria-label="Progression"
-					/>
-				{/if}
-			</div>
-
-			<div class="player-mini__row">
-				<div class="player-mini__art" aria-hidden="true">
-					{#if player.current?.artworkUrl}
-						<img src={player.current.artworkUrl} alt="" />
-					{/if}
-				</div>
+			<div class="wm-window">
+				<span class="wm-reel" class:is-live={player.playing} aria-hidden="true"></span>
 				<!-- svelte-ignore a11y_no_static_element_interactions -->
 				<div
-					class="player-mini__info"
+					class="wm-label"
+					role="button"
+					tabindex="0"
 					onpointerdown={onMiniDown}
 					onpointerup={onMiniUp}
+					onkeydown={(e) => {
+						if (e.key === 'Enter' || e.key === ' ') {
+							e.preventDefault();
+							openNowPlaying();
+						}
+					}}
 					title="Glisser : titre précédent/suivant · toucher ou glisser vers le haut : plein écran"
+					aria-label="Ouvrir le lecteur plein écran"
 				>
-					<strong>{player.current?.title ?? 'File vide'}</strong>
-					<small>{player.current?.subtitle ?? 'Ajoutez un morceau'}</small>
+					<div class="wm-title" class:wm-title--empty={!player.current}>{player.current?.title ?? 'File vide'}</div>
+					<div class="wm-artist">{player.current?.subtitle ?? 'Ajoutez un morceau'}</div>
 				</div>
+				<span class="wm-reel" class:is-live={player.playing} aria-hidden="true"></span>
 
 				{#if sleep.active}
 					<button
 						type="button"
-						class="pm-sleep"
+						class="wm-sleep"
 						onclick={() => sleep.cancel()}
 						title="Minuteur de sommeil actif — cliquer pour annuler"
 					>
@@ -1621,40 +1613,58 @@
 					</button>
 				{/if}
 
-				<span class="pm-time">
-					{formatTime(player.positionSec)}{isLiveStream ? ' · DIRECT' : ` / ${formatTime(player.durationSec)}`}
-				</span>
+				<!-- Ruban = progression cliquable (input range transparent par-dessus). -->
+				<div class="wm-tape">
+					<span class="wm-time">{formatTime(player.positionSec)}</span>
+					<div class="wm-seek" style:--progress={isLiveStream ? '100%' : `${progressRatio * 100}%`}>
+						{#if !isLiveStream}
+							<input
+								type="range"
+								min="0"
+								max={player.durationSec || 0}
+								value={player.positionSec}
+								oninput={seek}
+								aria-label="Progression"
+							/>
+						{/if}
+					</div>
+					{#if isLiveStream}
+						<span class="wm-time wm-live" class:is-on={player.playing}>● DIRECT</span>
+					{:else}
+						<span class="wm-time">{formatTime(player.durationSec)}</span>
+					{/if}
+				</div>
+				<div class="wm-glass" aria-hidden="true"></div>
+			</div>
 
-				<input
-					class="pm-vol"
-					type="range"
-					min="0"
-					max="1"
-					step="0.01"
-					value={player.volume}
-					oninput={setVolume}
-					aria-label="Volume"
-				/>
+			<input
+				class="wm-vol"
+				type="range"
+				min="0"
+				max="1"
+				step="0.01"
+				value={player.volume}
+				oninput={setVolume}
+				aria-label="Volume"
+			/>
 
-				<button type="button" class="pixel-btn pixel-btn--ghost pm-prev" onclick={() => player.prev()} aria-label="Piste précédente">⏮</button>
-				<button type="button" class="pixel-btn pixel-btn--play mini-play" onclick={togglePlayback} aria-label={player.playing ? 'Pause' : 'Lire'}>
-					{player.playing ? '⏸' : '▶'}
+			<div class="wm-deck" aria-label="Commandes de lecture">
+				<button type="button" class="wm-btn wm-btn--prev" onclick={() => player.prev()} aria-label="Piste précédente">
+					<span class="wm-btn__led"></span><span class="wm-btn__gl">⏮</span>
 				</button>
-				<button type="button" class="pixel-btn pixel-btn--ghost mini-next" onclick={() => player.next()} aria-label="Piste suivante">⏭</button>
-				<button
-					type="button"
-					class="pixel-btn pixel-btn--ghost pm-queue"
-					onclick={() => openNowPlaying('file')}
-					aria-label="File d'attente"
-					title="File d'attente"
-				>☰{#if player.queue.length > 0}<span class="pm-badge">{player.queue.length}</span>{/if}</button>
-				<button
-					type="button"
-					class="pixel-btn pixel-btn--ghost mini-toggle"
-					onclick={() => openNowPlaying()}
-					aria-label="Ouvrir le lecteur plein écran"
-					title="Ouvrir le lecteur plein écran"
-				>▴</button>
+				<button type="button" class="wm-btn wm-btn--play" onclick={togglePlayback} aria-label={player.playing ? 'Pause' : 'Lire'}>
+					<span class="wm-btn__led on"></span><span class="wm-btn__gl">{player.playing ? '⏸' : '▶'}</span>
+				</button>
+				<button type="button" class="wm-btn" onclick={() => player.next()} aria-label="Piste suivante">
+					<span class="wm-btn__led"></span><span class="wm-btn__gl">⏭</span>
+				</button>
+				<button type="button" class="wm-btn" onclick={() => openNowPlaying('file')} aria-label="File d'attente" title="File d'attente">
+					<span class="wm-btn__led" class:on={player.queue.length > 0}></span><span class="wm-btn__gl">☰</span>
+					{#if player.queue.length > 0}<span class="wm-btn__badge">{player.queue.length}</span>{/if}
+				</button>
+				<button type="button" class="wm-btn" onclick={() => openNowPlaying()} aria-label="Ouvrir le lecteur plein écran" title="Ouvrir le lecteur plein écran">
+					<span class="wm-btn__led"></span><span class="wm-btn__gl">▴</span>
+				</button>
 			</div>
 		</div>
 	</footer>
@@ -1963,9 +1973,9 @@
 		display: block;
 		/* Marge horizontale identique à .app-main (1.5rem) pour que le boîtier s'aligne
 		   exactement sur la largeur du contenu (bibliothèque, etc.). */
-		padding: 0.7rem 1.5rem 0.9rem;
+		padding: 0.45rem 1.5rem 0.55rem;
 		/* Évite la barre de gestes / home indicator en bas en PWA plein écran. */
-		padding-bottom: calc(0.9rem + env(safe-area-inset-bottom));
+		padding-bottom: calc(0.55rem + env(safe-area-inset-bottom));
 		padding-left: calc(1.5rem + env(safe-area-inset-left));
 		padding-right: calc(1.5rem + env(safe-area-inset-right));
 		border-top: var(--header-border-w, 4px) solid var(--bezel);
@@ -1974,98 +1984,280 @@
 		box-shadow: var(--playerbar-shadow, 0 6px 0 0 inset var(--shadow));
 	}
 
-	.pixel-btn--play {
-		min-width: 3.4rem;
-		font-size: 1.05rem;
-	}
+	/* ---- Lecteur : walkman en format fin (le plein écran vit dans NowPlaying) ---- */
 
-	/* ---- Lecteur : barre fine (le plein écran vit dans NowPlaying) ---- */
+	/* Façade : métal patiné (dithering) + biseau + scanlines, comme l'ancien boîtier. */
 	.player-mini {
+		position: relative;
 		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
+		align-items: center;
+		gap: 0.6rem;
+		/* Largeur exacte du contenu (72rem moins 2 × 1.5rem) : aligné sur la bibliothèque. */
 		max-width: 69rem;
 		margin: 0 auto;
+		padding: 0.45rem 0.6rem;
+		background:
+			repeating-linear-gradient(45deg, rgba(0, 0, 0, 0.09) 0 2px, transparent 2px 4px),
+			repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.025) 0 2px, transparent 2px 4px),
+			var(--panel);
+		border: 3px solid var(--bezel);
+		box-shadow:
+			inset 3px 3px 0 0 rgba(255, 255, 255, 0.1),
+			inset -3px -3px 0 0 rgba(0, 0, 0, 0.5),
+			inset 0 0 0 5px var(--panel-lo);
+	}
+	.player-mini::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		pointer-events: none;
+		background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.16) 0 2px, transparent 2px 4px);
 	}
 
-	.player-mini__row {
+	/* Fenêtre cassette : bobines de part et d'autre de l'étiquette, ruban en dessous. */
+	.wm-window {
+		position: relative;
+		flex: 1;
+		min-width: 0;
+		display: grid;
+		grid-template-columns: auto 1fr auto;
+		align-items: center;
+		gap: 0.2rem 0.5rem;
+		padding: 0.35rem 0.5rem;
+		background: var(--shadow);
+		border: 3px solid var(--bezel);
+		box-shadow: inset 3px 3px 0 rgba(0, 0, 0, 0.6);
+		overflow: hidden;
+	}
+	.wm-reel {
+		width: 34px;
+		height: 34px;
+		position: relative;
+		background: var(--plum-deep);
+		border: 2px solid var(--bezel);
+		box-shadow: inset 2px 2px 0 rgba(255, 255, 255, 0.06);
+	}
+	.wm-reel::before {
+		content: '';
+		position: absolute;
+		inset: 3px;
+		background: repeating-conic-gradient(
+			from 0deg,
+			var(--metal-mid) 0 22.5deg,
+			var(--panel) 22.5deg 45deg
+		);
+		-webkit-mask: radial-gradient(circle, transparent 26%, #000 27% 92%, transparent 93%);
+		mask: radial-gradient(circle, transparent 26%, #000 27% 92%, transparent 93%);
+	}
+	.wm-reel.is-live::before {
+		animation: wm-spin 3s steps(8) infinite;
+	}
+	.wm-reel::after {
+		content: '';
+		position: absolute;
+		inset: 12px;
+		background: var(--shadow);
+		box-shadow: 0 0 0 2px var(--panel);
+	}
+	.wm-label {
+		min-width: 0;
+		text-align: center;
+		cursor: pointer;
+		font-family: var(--font-pixel);
+		padding: 0.25rem 0.5rem;
+		background: var(--cream);
+		border-top: 3px solid var(--cream-bright);
+		border-bottom: 3px solid var(--metal-dark);
+		touch-action: none; /* capte le geste (glisser) au lieu de le laisser défiler */
+		user-select: none;
+	}
+	.wm-label:hover {
+		background: var(--cream-bright);
+	}
+	.wm-label:focus-visible {
+		outline: 2px solid var(--gold-bright);
+		outline-offset: 1px;
+	}
+	.wm-title {
+		font-size: 0.88rem;
+		line-height: 1.2;
+		color: var(--ink);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.wm-title--empty {
+		color: var(--metal-dark);
+	}
+	.wm-artist {
+		font-size: 0.64rem;
+		letter-spacing: 0.05em;
+		color: var(--metal-dark);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.wm-sleep {
+		position: absolute;
+		top: 2px;
+		right: 2px;
+		z-index: 2;
+		font-family: var(--font-pixel);
+		font-size: 0.55rem;
+		background: var(--plum-deep);
+		color: var(--gold-bright);
+		border: 1px solid var(--gold);
+		padding: 0.05rem 0.25rem;
+		cursor: pointer;
+	}
+	.wm-sleep:hover {
+		background: var(--gold);
+		color: var(--ink);
+	}
+
+	/* Ruban = progression (blocs pixel via dégradé sur --progress + curseur). */
+	.wm-tape {
+		grid-column: 1 / -1;
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
 	}
-
-	/* Liseré de progression : 4 px visibles, zone cliquable plus haute (input transparent). */
-	.pm-seek {
-		position: relative;
-		height: 14px;
-		margin-top: -0.2rem;
-	}
-	.pm-seek::before {
-		content: '';
-		position: absolute;
-		left: 0;
-		right: 0;
-		top: 5px;
-		height: 4px;
-		background: var(--plum);
-		box-shadow: inset 0 0 0 1px var(--bezel);
-	}
-	.pm-seek__fill {
-		position: absolute;
-		left: 0;
-		top: 5px;
-		height: 4px;
-		width: var(--progress, 0%);
-		background: repeating-linear-gradient(90deg, var(--gold-bright) 0 3px, var(--gold) 3px 4px);
-	}
-	.pm-seek input[type='range'] {
-		position: absolute;
-		inset: 0;
-		width: 100%;
-		height: 100%;
-		margin: 0;
-		opacity: 0;
-		cursor: pointer;
-	}
-	.pm-seek:focus-within::after {
-		content: '';
-		position: absolute;
-		inset: 3px -2px;
-		outline: 2px solid var(--gold-bright);
-		pointer-events: none;
-	}
-
-	.pm-time {
+	.wm-time {
 		flex-shrink: 0;
-		font-size: 0.68rem;
-		color: var(--muted);
+		font-size: 0.6rem;
+		letter-spacing: 0.06em;
+		color: var(--teal);
 		font-variant-numeric: tabular-nums;
 	}
-	.pm-vol {
+	.wm-live {
+		color: var(--muted);
+	}
+	.wm-live.is-on {
+		color: var(--coral);
+		text-shadow: 0 0 8px var(--coral);
+		animation: lamp-blink 3s steps(1) infinite;
+	}
+	.wm-seek {
+		position: relative;
+		flex: 1;
+		height: 10px;
+		border: 2px solid var(--bezel);
+		background:
+			repeating-linear-gradient(90deg, transparent 0 3px, rgba(0, 0, 0, 0.18) 3px 4px),
+			linear-gradient(
+				90deg,
+				var(--gold-bright) 0,
+				var(--gold) var(--progress, 0%),
+				var(--plum-deep) var(--progress, 0%)
+			);
+		box-shadow: inset 0 2px 0 rgba(0, 0, 0, 0.5);
+	}
+	.wm-seek::after {
+		content: '';
+		position: absolute;
+		top: -3px;
+		bottom: -3px;
+		left: var(--progress, 0%);
+		width: 4px;
+		transform: translateX(-2px);
+		background: var(--cream-bright);
+		box-shadow: 0 0 6px 0 var(--glow);
+		pointer-events: none;
+	}
+	.wm-seek input[type='range'] {
+		position: absolute;
+		inset: -6px 0;
+		width: 100%;
+		height: calc(100% + 12px);
+		opacity: 0;
+		cursor: pointer;
+		margin: 0;
+	}
+	/* Reflet vitre : bandes nettes en biais (pas de dégradé lisse). */
+	.wm-glass {
+		position: absolute;
+		inset: 0;
+		pointer-events: none;
+		background: linear-gradient(
+			120deg,
+			transparent 0 46%,
+			rgba(255, 255, 255, 0.06) 46% 49%,
+			transparent 49% 55%,
+			rgba(255, 255, 255, 0.04) 55% 57%,
+			transparent 57%
+		);
+	}
+
+	.wm-vol {
+		position: relative;
+		z-index: 1;
 		flex-shrink: 0;
-		width: 6rem;
+		width: 5.5rem;
 		accent-color: var(--gold-bright);
 	}
-	.pm-sleep {
-		flex-shrink: 0;
-		background: none;
-		border: 2px solid var(--bezel);
-		color: var(--gold-bright);
-		font-family: var(--font-pixel);
-		font-size: 0.62rem;
-		padding: 0.15rem 0.4rem;
-		cursor: pointer;
-	}
-	.pm-sleep:hover {
-		color: var(--coral);
-	}
-	.pm-queue {
+
+	/* Boutons : blocs crantés + LED témoin, version compacte. */
+	.wm-deck {
 		position: relative;
+		z-index: 1;
+		display: flex;
+		gap: 0.4rem;
+		flex-shrink: 0;
 	}
-	.pm-badge {
+	.wm-btn {
+		position: relative;
+		width: 2.9rem;
+		height: 2.7rem;
+		display: grid;
+		place-items: center;
+		cursor: pointer;
+		font-family: var(--font-pixel);
+		font-size: 0.95rem;
+		color: var(--cream);
+		background: var(--panel-hi);
+		border: 3px solid var(--bezel);
+		box-shadow:
+			inset 2px 2px 0 rgba(255, 255, 255, 0.14),
+			inset -2px -3px 0 rgba(0, 0, 0, 0.5),
+			0 3px 0 var(--bezel);
+	}
+	.wm-btn:active {
+		transform: translateY(2px);
+		box-shadow: inset 2px 2px 0 rgba(255, 255, 255, 0.14), inset -2px -3px 0 rgba(0, 0, 0, 0.5), 0 1px 0 var(--bezel);
+	}
+	.wm-btn__led {
 		position: absolute;
-		top: -6px;
-		right: -6px;
+		top: 3px;
+		left: 50%;
+		transform: translateX(-50%);
+		width: 16px;
+		height: 3px;
+		background: var(--plum-deep);
+	}
+	.wm-btn__led.on {
+		background: var(--gold-bright);
+		box-shadow: 0 0 6px var(--glow);
+	}
+	.wm-btn__gl {
+		margin-top: 3px;
+	}
+	.wm-btn--play {
+		width: 3.5rem;
+		color: var(--ink);
+		background: var(--gold-bright);
+		box-shadow:
+			inset 2px 2px 0 rgba(255, 255, 255, 0.5),
+			inset -2px -3px 0 rgba(168, 84, 47, 0.7),
+			0 3px 0 var(--rust);
+	}
+	.wm-btn--play:active {
+		transform: translateY(2px);
+		box-shadow: inset 2px 2px 0 rgba(255, 255, 255, 0.5), inset -2px -3px 0 rgba(168, 84, 47, 0.7), 0 1px 0 var(--rust);
+	}
+	.wm-btn__badge {
+		position: absolute;
+		top: -7px;
+		right: -7px;
 		min-width: 16px;
 		height: 16px;
 		padding: 0 3px;
@@ -2077,51 +2269,13 @@
 		border: 2px solid var(--bezel);
 	}
 
-	.player-mini__art {
-		flex-shrink: 0;
-		width: 2.5rem;
-		height: 2.5rem;
-		border: 2px solid var(--bezel);
-		background: var(--plum-deep);
-		overflow: hidden;
+	@keyframes wm-spin {
+		to { transform: rotate(360deg); }
 	}
-
-	.player-mini__art img {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-	}
-
-	.player-mini__info {
-		flex: 1;
-		min-width: 0;
-		display: flex;
-		flex-direction: column;
-		line-height: 1.15;
-		cursor: pointer;
-		touch-action: none; /* capte le geste (glisser) au lieu de le laisser défiler */
-		user-select: none;
-	}
-
-	.player-mini__info strong {
-		font-size: 0.85rem;
-		color: var(--cream-bright);
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-
-	.player-mini__info small {
-		font-size: 0.7rem;
-		color: var(--muted);
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-
-	.player-mini .pixel-btn {
-		flex-shrink: 0;
-		padding: 0.4rem 0.6rem;
+	@media (prefers-reduced-motion: reduce) {
+		.wm-reel.is-live::before {
+			animation: none;
+		}
 	}
 
 	.app-version {
@@ -2221,16 +2375,33 @@
 		}
 
 		.player-bar {
-			padding: 0.6rem 0.75rem 0.65rem;
+			padding: 0.4rem 0.6rem 0.45rem;
 		}
 
-		/* Barre réduite à l'essentiel sur téléphone : volume (touches matérielles), précédent
-		   (glisser le titre) et durée sont dans l'écran plein écran. */
-		.pm-vol,
-		.pm-prev,
-		.pm-time {
+		/* Walkman réduit à l'essentiel sur téléphone : ni bobines, ni volume (touches matérielles),
+		   ni précédent (glisser l'étiquette) ; les durées restent dans le plein écran. */
+		.player-mini {
+			gap: 0.4rem;
+			padding: 0.35rem 0.4rem;
+		}
+		.wm-reel,
+		.wm-vol,
+		.wm-btn--prev,
+		.wm-tape .wm-time {
 			display: none;
 		}
-
+		.wm-window {
+			grid-template-columns: 1fr;
+			padding: 0.3rem 0.4rem;
+		}
+		.wm-deck {
+			gap: 0.3rem;
+		}
+		.wm-btn {
+			width: 2.35rem;
+		}
+		.wm-btn--play {
+			width: 2.9rem;
+		}
 	}
 </style>
