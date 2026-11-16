@@ -61,6 +61,8 @@ export type RankOptions = {
 	/** Nombre minimal de titres à renvoyer, quitte à relâcher le seuil. */
 	minResults?: number;
 	rand?: () => number;
+	/** Mélange le résultat en évitant que deux titres d'un même artiste se suivent (défaut : oui). */
+	shuffle?: boolean;
 };
 
 export function normalizeGenre(g: string): string {
@@ -150,16 +152,42 @@ export function rankFocusedMix<T>(
 	if (pool.length < minResults) pool = ranked.slice(0, Math.max(minResults, pool.length));
 
 	const perArtist = new Map<string, number>();
-	const out: T[] = [];
+	const picked: { item: T; artist: string; isSeed: boolean }[] = [];
 	for (const r of pool) {
-		if (out.length >= opts.limit) break;
+		if (picked.length >= opts.limit) break;
 		const a = r.c.artist ? normalizeGenre(r.c.artist) : '';
 		if (a) {
 			const n = perArtist.get(a) ?? 0;
 			if (n >= maxPerArtist) continue;
 			perArtist.set(a, n + 1);
 		}
-		out.push(r.c.item);
+		picked.push({ item: r.c.item, artist: a, isSeed: Boolean(r.c.isSeed) });
+	}
+	if (opts.shuffle === false) return picked.map((p) => p.item);
+
+	// Le classement regroupe naturellement les titres d'un même artiste en tête : on mélange la
+	// sélection, puis on espace les artistes. Un titre graine (mix lancé depuis un titre) reste premier.
+	const seeds = picked.filter((p) => p.isSeed);
+	return [...seeds, ...spreadArtists(picked.filter((p) => !p.isSeed), rand)].map((p) => p.item);
+}
+
+/**
+ * Mélange (Fisher–Yates) puis réordonne de façon gloutonne pour qu'aucun artiste n'apparaisse deux
+ * fois de suite — ni dans les deux derniers titres — tant que c'est possible. Les titres sans
+ * artiste connu ne sont jamais considérés comme voisins.
+ */
+export function spreadArtists<P extends { artist: string }>(items: P[], rand: () => number = Math.random): P[] {
+	const pool = [...items];
+	for (let i = pool.length - 1; i > 0; i--) {
+		const j = Math.floor(rand() * (i + 1));
+		[pool[i], pool[j]] = [pool[j], pool[i]];
+	}
+	const out: P[] = [];
+	while (pool.length > 0) {
+		const recent = new Set(out.slice(-2).map((p) => p.artist).filter(Boolean));
+		let idx = pool.findIndex((p) => !p.artist || !recent.has(p.artist));
+		if (idx < 0) idx = 0; // plus le choix : on accepte la répétition
+		out.push(pool.splice(idx, 1)[0]);
 	}
 	return out;
 }

@@ -71,7 +71,8 @@ En ouvrant un artiste :
   sur une analyse audio des fichiers, que Jellyfin ne fait pas : Tentacle s'en approche avec deux
   signaux. (1) les **artistes proches** (Deezer sur la version Web, « artistes similaires » de Jellyfin),
   dont il retrouve les titres **dans ta bibliothèque** ; (2) les **genres** de l'artiste, où un genre rare
-  compte plus qu'un genre fourre-tout comme « Rock ». Au plus 5 titres par artiste. Sur l'APK (pas de
+  compte plus qu'un genre fourre-tout comme « Rock ». Au plus 5 titres par artiste, **dans un ordre mélangé** : jamais deux titres du même artiste
+  d'affilée tant que la sélection le permet. Sur l'APK (pas de
   serveur Deezer), seuls Jellyfin et les genres servent ; sans genres renseignés, repli sur l'Instant Mix
   de Jellyfin. Même logique pour les mix d'album, **Mix surprise** et **Lecture sans fin**.
 - Puis ses albums, et une section **Artistes similaires**.

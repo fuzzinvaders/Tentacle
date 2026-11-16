@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { scoreCandidates, rankFocusedMix, dominantGenres, normalizeGenre, artistAffinities } from './mix';
+import { scoreCandidates, rankFocusedMix, dominantGenres, normalizeGenre, artistAffinities, spreadArtists } from './mix';
 
 const c = (name: string, genres: string[], artist = name) => ({ item: name, genres, artist });
 
@@ -102,7 +102,34 @@ describe('rankFocusedMix avec affinité d’artiste', () => {
 			c('a', ['Rock'], 'A'),
 			{ ...c('b', ['Rock'], 'B'), affinity: 0.8 }
 		];
-		const out = rankFocusedMix(['Rock'], cands, { limit: 5, minResults: 1, rand });
+		const out = rankFocusedMix(['Rock'], cands, { limit: 5, minResults: 1, rand, shuffle: false });
 		expect(out[0]).toBe('b');
+	});
+});
+
+describe('mélange du mix', () => {
+	it('n’enchaîne jamais deux titres du même artiste quand c’est évitable', () => {
+		const cands = [
+			...Array.from({ length: 5 }, (_, i) => c(`a${i}`, ['Jazz'], 'A')),
+			...Array.from({ length: 5 }, (_, i) => c(`b${i}`, ['Jazz'], 'B')),
+			...Array.from({ length: 5 }, (_, i) => c(`c${i}`, ['Jazz'], 'C'))
+		];
+		for (const seed of [0.1, 0.5, 0.9]) {
+			let k = seed;
+			const rand = () => (k = (k * 9301 + 49297) % 233280) / 233280;
+			const out = rankFocusedMix(['Jazz'], cands, { limit: 15, minResults: 1, maxPerArtist: 5, rand });
+			expect(out).toHaveLength(15);
+			for (let i = 1; i < out.length; i++) expect(out[i][0]).not.toBe(out[i - 1][0]);
+		}
+	});
+
+	it('garde le titre graine en premier', () => {
+		const cands = [c('x', ['Jazz'], 'X'), { ...c('seed', ['Jazz'], 'S'), isSeed: true }, c('y', ['Jazz'], 'Y')];
+		expect(rankFocusedMix(['Jazz'], cands, { limit: 5, minResults: 1 })[0]).toBe('seed');
+	});
+
+	it('spreadArtists tolère un seul artiste (pas de boucle infinie)', () => {
+		const items = Array.from({ length: 4 }, (_, i) => ({ id: i, artist: 'A' }));
+		expect(spreadArtists(items)).toHaveLength(4);
 	});
 });
